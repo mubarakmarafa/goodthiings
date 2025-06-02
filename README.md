@@ -2,11 +2,11 @@
 
 A high-performance, infinite scrolling grid component for React that provides smooth touch/mouse interactions with momentum-based scrolling. Perfect for displaying large datasets in a grid format with custom cell renderers.
 
-## 🪩 [**Explore Thiings.co →**](https://username.github.io/thiings-grid)
+## 🪩 [**Explore Thiings.co →**](https://thiings.co)
 
 > This is the component that powers the interactive grid on [thiings.co](https://thiings.co/) - A growing collection of 1200+ free 3D icons, generated with AI.
 
-## 🎮 [**Try the Live Playground →**](https://username.github.io/thiings-grid)
+## 🎮 [**Try the Live Playground →**](https://charlieclark.github.io/thiings-grid)
 
 >Experience ThiingsGrid in action with interactive examples, copy-paste ready code, and real-time configuration options.
 
