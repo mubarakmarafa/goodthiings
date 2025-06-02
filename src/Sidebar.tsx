@@ -18,9 +18,9 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
       </div>
 
       <nav>
-        <ul className="list-none p-0 mb-8">
+        <div className="list-none p-0 mb-8 text-black">
           {componentNames.map((exampleName, index) => (
-            <li
+            <div
               key={index}
               className={`mb-4 cursor-pointer px-3 py-2 rounded transition-colors ${
                 currentExample === index
@@ -30,9 +30,9 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
               onClick={() => onExampleChange(index)}
             >
               {exampleName}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       </nav>
     </div>
 
