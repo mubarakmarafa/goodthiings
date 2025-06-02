@@ -1,4 +1,4 @@
-import { componentNames, exampleComponents, sourceCodes } from "./Playground";
+import { componentNames, sourceCodes } from "./Playground";
 import { toast } from "sonner";
 
 import thingsGridSource from "../lib/ThiingsGrid.tsx?raw";
