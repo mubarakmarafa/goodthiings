@@ -26,6 +26,10 @@ export const sourceCodes = [
   cardLayoutSource,
 ];
 
+export const componentNames = sourceCodes.map((code) => {
+  const match = code.match(/export\s+default\s+(\w+)/);
+  return match?.[1] || "Unknown";
+});
 type PlaygroundProps = {
   currentExample: number;
 };

@@ -1,4 +1,4 @@
-import { exampleComponents, sourceCodes } from "./Playground";
+import { componentNames, exampleComponents, sourceCodes } from "./Playground";
 import { toast } from "sonner";
 
 import thingsGridSource from "../lib/ThiingsGrid.tsx?raw";
@@ -8,7 +8,7 @@ type SourceCodeProps = {
 };
 
 const SourceCode = ({ currentExample }: SourceCodeProps) => {
-  const currentComponent = exampleComponents[currentExample];
+  const currentComponentName = componentNames[currentExample];
   const currentSourceCode = sourceCodes[currentExample];
 
   const handleCopy = () => {
@@ -26,7 +26,7 @@ const SourceCode = ({ currentExample }: SourceCodeProps) => {
   return (
     <section className="flex-[2] p-6 border-r border-gray-200 bg-gray-50 flex flex-col">
       <div className="mb-4">
-        <h3 className="mt-0 text-lg font-semibold">{currentComponent.name}</h3>
+        <h3 className="mt-0 text-lg font-semibold">{currentComponentName}</h3>
       </div>
 
       <pre className="bg-gray-100 p-4 rounded-lg text-xs leading-relaxed overflow-auto flex-1 border border-gray-200 font-mono mb-6">

@@ -1,4 +1,4 @@
-import { exampleComponents } from "./Playground";
+import { componentNames } from "./Playground";
 
 type SidebarProps = {
   currentExample: number;
@@ -19,7 +19,7 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
 
       <nav>
         <ul className="list-none p-0 mb-8">
-          {exampleComponents.map((example, index) => (
+          {componentNames.map((exampleName, index) => (
             <li
               key={index}
               className={`mb-4 cursor-pointer px-3 py-2 rounded transition-colors ${
@@ -29,7 +29,7 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
               }`}
               onClick={() => onExampleChange(index)}
             >
-              {example.name}
+              {exampleName}
             </li>
           ))}
         </ul>
@@ -47,7 +47,9 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
       </a>
 
       <a
-        href="#"
+        href="https://github.com/charlieclark/thiings-grid"
+        target="_blank"
+        rel="noopener noreferrer"
         className="block w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg text-center text-sm transition-colors duration-200 no-underline"
       >
         view docs

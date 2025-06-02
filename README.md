@@ -38,7 +38,7 @@ npm install react react-dom
 import ThiingsGrid, { type ItemConfig } from './path/to/ThiingsGrid';
 
 const MyCell = ({ gridIndex, position }: ItemConfig) => (
-  <div className="absolute inset-1 flex items-center justify-center bg-blue-50 border border-blue-500 rounded">
+  <div className="absolute inset-1 flex items-center justify-center">
     {gridIndex}
   </div>
 );
@@ -288,47 +288,6 @@ The component handles:
 - **Touch**: Touch and drag to pan
 - **Wheel**: Scroll wheel for precise movements
 - **Momentum**: Automatic momentum scrolling with physics
-
-### Keyboard Support
-
-Currently, keyboard navigation is not built-in, but you can add it:
-
-```tsx
-const KeyboardNavigableGrid = () => {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const step = 50;
-      switch (e.key) {
-        case 'ArrowUp':
-          setPosition(prev => ({ ...prev, y: prev.y + step }));
-          break;
-        case 'ArrowDown':
-          setPosition(prev => ({ ...prev, y: prev.y - step }));
-          break;
-        case 'ArrowLeft':
-          setPosition(prev => ({ ...prev, x: prev.x + step }));
-          break;
-        case 'ArrowRight':
-          setPosition(prev => ({ ...prev, x: prev.x - step }));
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  return (
-    <ThiingsGrid
-      gridSize={80}
-      renderItem={MyCell}
-      initialPosition={position}
-    />
-  );
-};
-```
 
 ## 🔍 Development
 

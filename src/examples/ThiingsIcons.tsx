@@ -1,15 +1,15 @@
 import ThiingsGrid, { type ItemConfig } from "../../lib/ThiingsGrid";
 
 const images = [
-  "/thiings/1.png",
-  "/thiings/2.png",
-  "/thiings/3.png",
-  "/thiings/4.png",
-  "/thiings/5.png",
-  "/thiings/6.png",
-  "/thiings/7.png",
-  "/thiings/8.png",
-  "/thiings/9.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/1.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/2.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/3.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/4.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/5.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/6.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/7.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/8.png",
+  "https://charlieclark.github.io/thiings-grid/thiings/9.png",
 ];
 
 const ThiingsIconCell = ({ gridIndex }: ItemConfig) => (
