@@ -5,6 +5,7 @@ const ThiingsIconCell = ({ gridIndex }: ItemConfig) => {
   return (
     <div className="absolute inset-1 flex items-center justify-center">
       <img
+        draggable={false}
         src={`/thiings-grid/thiings/${images[gridIndex % images.length]}.png`}
       />
     </div>
