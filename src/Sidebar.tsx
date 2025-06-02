@@ -6,7 +6,7 @@ type SidebarProps = {
 };
 
 const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
-  <aside className="w-56 bg-gray-50 border-r border-gray-300 px-4 py-6 flex flex-col justify-between">
+  <aside className="flex-shrink-0 bg-gray-50 border-r border-gray-300 px-4 py-6 flex flex-col justify-between">
     <div>
       <div className="mb-8">
         <h2 className="mt-0 text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent tracking-tight">
