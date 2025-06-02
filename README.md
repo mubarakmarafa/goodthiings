@@ -8,7 +8,7 @@ A high-performance, infinite scrolling grid component for React that provides sm
 
 ## 🎮 [**Try the Live Playground →**](https://charlieclark.github.io/thiings-grid)
 
->Experience ThiingsGrid in action with interactive examples, copy-paste ready code, and real-time configuration options.
+> Experience ThiingsGrid in action with interactive examples and copy-paste ready code.
 
 ## ✨ Features
 
