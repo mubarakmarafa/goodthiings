@@ -18,7 +18,7 @@ const Sidebar = ({ currentExample, onExampleChange }: SidebarProps) => (
       </div>
 
       <nav>
-        <div className="list-none p-0 mb-8 text-black">
+        <div className="list-none p-0 mb-8">
           {componentNames.map((exampleName, index) => (
             <div
               key={index}
