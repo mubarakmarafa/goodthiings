@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 type StyleType = '3d' | 'handdrawn';
 
