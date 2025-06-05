@@ -4,7 +4,6 @@ import LoginScreen from "./components/auth/LoginScreen";
 import ThiingsIcons from "./examples/ThiingsIcons";
 import UserInput from "./components/UserInput";
 import { Toaster } from 'sonner';
-import './App.css'
 
 function AppContent() {
   const { user, isLoading, login, signup } = useAuth();
