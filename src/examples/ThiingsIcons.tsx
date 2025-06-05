@@ -87,7 +87,7 @@ const ThiingsIconCell = ({ gridIndex, position, isMoving }: ItemConfig) => {
     >
       <img
         draggable={false} // Grid images are never draggable, only the floating one is
-        src={`/thiings-grid/thiings/${CONFIG.images[gridIndex % CONFIG.images.length]}.png`}
+        src={`/thiings/${CONFIG.images[gridIndex % CONFIG.images.length]}.png`}
         alt={`Icon ${gridIndex}`}
         className="w-full h-full object-contain"
         style={{
@@ -343,7 +343,7 @@ export const ThiingsIcons = () => {
               {/* Draggable image */}
               <img
                 draggable={true}
-                src={`/thiings-grid/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`}
+                src={`/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`}
                 alt={`Selected Icon ${selectedIndex}`}
                 className="w-full h-full object-contain shadow-2xl relative"
                 style={{
@@ -357,7 +357,7 @@ export const ThiingsIcons = () => {
                   e.dataTransfer.setData("application/json", JSON.stringify({
                     gridIndex: selectedIndex,
                     position: selectedImageState.position,
-                    imageUrl: `/thiings-grid/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`
+                    imageUrl: `/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`
                   }));
                   e.dataTransfer.effectAllowed = "copy";
                 }}
