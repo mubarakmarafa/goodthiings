@@ -409,23 +409,7 @@ export const ThiingsIcons = () => {
         );
       })()}
       
-      {/* Instructions overlay */}
-      {!selectedImageState.isSelected && (
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg z-10">
-          <h3 className="text-sm font-bold text-gray-800 mb-1">ThiingsIcons Grid</h3>
-          <p className="text-xs text-gray-600">Click an icon to select • Drag selected icons out • Click empty space to deselect</p>
-        </div>
-      )}
-      
-      {/* Selection info */}
-      {selectedImageState.isSelected && (
-        <div className="absolute top-4 left-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 shadow-lg z-50">
-          <h3 className="text-sm font-bold text-blue-800 mb-1">Image Ready to Drag</h3>
-          <p className="text-xs text-blue-600">
-            Icon #{selectedImageState.gridIndex} • Drag the centered image to export • Click outside or press ESC to deselect
-          </p>
-        </div>
-      )}
+
     </div>
   );
 };
