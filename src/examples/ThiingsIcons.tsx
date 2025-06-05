@@ -353,13 +353,43 @@ export const ThiingsIcons = () => {
                 }}
                 onDragStart={(e) => {
                   console.log(`🚀 Starting drag of floating image ${selectedIndex}`);
-                  e.dataTransfer.setData("text/plain", `Icon ${selectedIndex}`);
+                  
+                  const imageUrl = `${window.location.origin}/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`;
+                  const fileName = `thiings-icon-${selectedIndex}.png`;
+                  
+                  // Set the drag image to be the actual image element
+                  e.dataTransfer.setDragImage(e.target as HTMLImageElement, 
+                    (e.target as HTMLImageElement).width / 2, 
+                    (e.target as HTMLImageElement).height / 2
+                  );
+                  
+                  // Set multiple data formats for maximum compatibility
+                  e.dataTransfer.setData("text/uri-list", imageUrl);
+                  e.dataTransfer.setData("text/html", `<img src="${imageUrl}" alt="${fileName}">`);
+                  e.dataTransfer.setData("text/plain", imageUrl);
                   e.dataTransfer.setData("application/json", JSON.stringify({
                     gridIndex: selectedIndex,
                     position: selectedImageState.position,
-                    imageUrl: `/thiings/${CONFIG.images[selectedIndex % CONFIG.images.length]}.png`
+                    imageUrl: imageUrl,
+                    fileName: fileName
                   }));
-                  e.dataTransfer.effectAllowed = "copy";
+                  
+                  // Try to fetch and set image data as blob for better compatibility
+                  fetch(imageUrl)
+                    .then(response => response.blob())
+                    .then(blob => {
+                      // Create a file-like object
+                      const file = new File([blob], fileName, { type: blob.type });
+                      const dataTransfer = new DataTransfer();
+                      dataTransfer.items.add(file);
+                      
+                      // Note: This is experimental and may not work in all browsers
+                      console.log(`✅ Image blob prepared for ${fileName}`);
+                    })
+                    .catch(err => console.log("Could not fetch image blob:", err));
+                  
+                  e.dataTransfer.effectAllowed = "copyLink";
+                  console.log(`✅ Set up drag data for ${fileName} at ${imageUrl}`);
                 }}
                 onDragEnd={() => {
                   console.log(`✅ Drag completed for image ${selectedIndex}`);
