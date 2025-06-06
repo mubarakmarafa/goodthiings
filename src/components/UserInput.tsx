@@ -139,9 +139,9 @@ export default function UserInput() {
               </div>
               
               {/* White Content Area */}
-              <div className="bg-white px-8 pt-6 pb-1 flex flex-col flex-1 rounded-b-3xl">
+              <div className="bg-white pt-6 flex flex-col flex-1 rounded-b-3xl">
                 {/* Generated Image - Large and Prominent */}
-                <div className="flex-1 flex items-center justify-center mb-6">
+                <div className="flex-1 flex items-center justify-center mb-6 px-8">
                   <div className="flex items-center justify-center" style={{ maxWidth: '180px', maxHeight: '180px' }}>
                     <img 
                       src={previewImage.image_url} 
@@ -152,7 +152,7 @@ export default function UserInput() {
                 </div>
                 
                 {/* Action Buttons - extend to edges */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 px-1 pb-1">
                   <button
                     onClick={handleDiscardImage}
                     className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
