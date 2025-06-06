@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, apiKey: userApiKey }),
       });
 
       console.log('📡 Response received:', {
