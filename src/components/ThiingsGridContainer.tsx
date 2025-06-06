@@ -641,6 +641,15 @@ export const ThiingsGridContainer = () => {
   const { user } = useAuth();
   const { images, loadUserImages } = useImageGeneration();
 
+  // Debug: Track images prop changes in wrapper
+  useEffect(() => {
+    console.log('🚨 WRAPPER: Images prop changed! Count:', images.length);
+    console.log('🚨 WRAPPER: Images array:', images.map(img => ({ id: img.id, status: img.generation_status })));
+  }, [images]);
+
+  // Debug: Track renders
+  console.log('🔄 WRAPPER: Component rendering. User exists:', !!user, 'Images count:', images.length);
+
   // Only render heavy components when user exists
   if (!user) {
     // Reset global state when no user
