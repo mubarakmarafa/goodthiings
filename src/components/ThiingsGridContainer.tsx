@@ -169,43 +169,34 @@ export const ThiingsGridContainer = () => {
   useEffect(() => {
     const items: GridItem[] = [];
     
-    // Add static thiings icons in a spiral pattern
-    let currentX = 0, currentY = 0;
-    let direction = 0; // 0: right, 1: down, 2: left, 3: up
-    let steps = 1;
-    let stepCount = 0;
-    let stepsTaken = 0;
+    // Create a map to track generated image positions
+    const generatedPositions = new Set<string>();
+    images.forEach((image) => {
+      generatedPositions.add(`${image.grid_position_x},${image.grid_position_y}`);
+    });
     
-    for (let i = 0; i < CONFIG.staticImages.length; i++) {
-      items.push({
-        id: `static-${i}`,
-        type: 'static',
-        gridX: currentX,
-        gridY: currentY,
-        staticIndex: i,
-      });
-
-      // Move to next position in spiral
-      stepsTaken++;
-      switch (direction) {
-        case 0: currentX++; break; // right
-        case 1: currentY++; break; // down
-        case 2: currentX--; break; // left
-        case 3: currentY--; break; // up
-      }
-
-      if (stepsTaken === steps) {
-        stepsTaken = 0;
-        direction = (direction + 1) % 4;
-        stepCount++;
-        if (stepCount === 2) {
-          steps++;
-          stepCount = 0;
+    // Add static thiings icons in a repeating endless grid
+    const gridRange = 30; // Create a large grid area
+    for (let x = -gridRange; x <= gridRange; x++) {
+      for (let y = -gridRange; y <= gridRange; y++) {
+        const positionKey = `${x},${y}`;
+        
+        // Skip positions that have generated images
+        if (!generatedPositions.has(positionKey)) {
+          // Create repeating pattern using modulo to cycle through static images
+          const imageIndex = Math.abs((x * 7 + y * 11) % CONFIG.staticImages.length);
+          items.push({
+            id: `static-${x}-${y}`,
+            type: 'static',
+            gridX: x,
+            gridY: y,
+            staticIndex: imageIndex,
+          });
         }
       }
     }
 
-    // Add generated images
+    // Add generated images (these will overlay the static grid)
     images.forEach((image) => {
       items.push({
         id: `generated-${image.id}`,
