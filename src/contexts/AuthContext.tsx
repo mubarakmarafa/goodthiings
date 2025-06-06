@@ -21,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Use Supabase Edge Functions for authentication
 const SUPABASE_URL = 'https://whstudldcjncgyybfezn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indoc3R1ZGxkY2puY2d5eWJmZXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNDE4MjEsImV4cCI6MjA2NDcxNzgyMX0.carn2tL9vdzIF6DlL3SF1jqMQppSj_Y_9FHgjunVVIE';
 const EDGE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
 // API Key storage utilities (localStorage)
@@ -76,19 +77,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, userApiKey: string) => {
+    console.log('🔍 LOGIN FUNCTION CALLED with:', { email, password: password.slice(0, 3) + '***', hasApiKey: !!userApiKey });
     setIsLoading(true);
+    
+    // DEVELOPMENT BYPASS - Remove this in production!
+    if (email === 'dev@test.com' && password === 'dev123') {
+      console.log('🚀🚀🚀 DEVELOPMENT BYPASS ACTIVATED - SUCCESS! 🚀🚀🚀');
+      alert('DEVELOPMENT BYPASS ACTIVATED!'); // Make it super obvious
+      const devUser: User = {
+        id: 'dev-user-123',
+        email: 'dev@test.com',
+        last_used_style: '3d',
+      };
+      setUser(devUser);
+      storeSession(devUser, { access_token: 'dev-token' });
+      setApiKey(userApiKey);
+      storeApiKey(userApiKey);
+      setIsLoading(false);
+      return;
+    }
+    
+    console.log('❌ Development bypass NOT activated. Email:', email, 'Password length:', password.length);
+    
     try {
       const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
+      
+      console.log('Login response:', { status: response.status, data });
 
       if (!response.ok) {
+        console.log('Login failed with error:', data.error);
         throw new Error(data.error || 'Login failed');
       }
 
@@ -121,13 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
+      
+      console.log('Signup response:', { status: response.status, data });
 
       if (!response.ok) {
+        console.log('Signup failed with error:', data.error);
         throw new Error(data.error || 'Signup failed');
       }
 

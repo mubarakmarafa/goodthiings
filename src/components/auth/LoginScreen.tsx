@@ -29,19 +29,40 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
     setIsLoading(true);
     
     try {
+      console.log('Starting authentication with:', { email, hasPassword: !!password, hasApiKey: !!apiKey });
+      
       // Try login first
       try {
         await onLogin(email, password, apiKey);
         toast.success('Welcome back!');
       } catch (loginError: any) {
+        console.log('Login failed, trying signup. Error was:', loginError.message);
+        
         // If login fails due to user not found, try signup
         if (loginError.message?.includes('Invalid login credentials') || 
-            loginError.message?.includes('Email not confirmed') ||
             loginError.message?.includes('User not found')) {
           
           toast.info('Creating your account...');
-          await onSignUp(email, password, apiKey);
-          toast.success('Account created successfully! Welcome to GoodThiings!');
+          try {
+            await onSignUp(email, password, apiKey);
+            toast.success('Account created successfully! Welcome to GoodThiings!');
+          } catch (signupError: any) {
+            console.log('Signup also failed:', signupError.message);
+            
+            // Better error messages for common Supabase issues
+            if (signupError.message?.includes('Email address') && signupError.message?.includes('invalid')) {
+              toast.error('Please use a valid email address (try Gmail, Yahoo, or your work email)');
+            } else if (signupError.message?.includes('weak') || signupError.message?.includes('password')) {
+              toast.error('Password must be at least 6 characters long');
+            } else {
+              toast.error(`Account creation failed: ${signupError.message}`);
+            }
+            throw signupError;
+          }
+        } else if (loginError.message?.includes('Email not confirmed')) {
+          // Handle email confirmation case
+          toast.error('Please check your email and click the confirmation link, then try again.');
+          throw loginError;
         } else {
           // Other login errors (wrong password, etc.)
           throw loginError;
@@ -49,7 +70,12 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
       }
     } catch (error: any) {
       console.error('Auth error:', error);
-      toast.error(error.message || 'Authentication failed');
+      // Don't show duplicate error messages if we already showed a specific one
+      if (!error.message?.includes('Email address') && 
+          !error.message?.includes('Password must be') && 
+          !error.message?.includes('Account creation failed')) {
+        toast.error(error.message || 'Authentication failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -139,6 +165,7 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold text-[#333] placeholder-[#c1c1c1] px-4 py-3"
+                  autoComplete="email"
                   required
                   disabled={isLoading}
                 />
@@ -152,6 +179,7 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold text-[#333] placeholder-[#c1c1c1] px-4 py-3 pr-14"
+                  autoComplete="new-password"
                   required
                   disabled={isLoading}
                 />
@@ -208,6 +236,7 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   className="w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold text-[#333] placeholder-[#c1c1c1] px-4 py-3"
+                  autoComplete="off"
                   required
                   disabled={isLoading}
                 />
