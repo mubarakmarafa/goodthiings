@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
+import { useImageGeneration } from '../hooks/useImageGeneration';
 import { useAuth } from '../contexts/AuthContext';
 import ThiingsGrid, { type ItemConfig } from "../../lib/ThiingsGrid";
 
@@ -154,7 +154,7 @@ export const ThiingsGridContainer = () => {
   const [, forceUpdate] = useState(0);
   const lastGridPositionRef = useRef({ x: 0, y: 0 });
   
-  const { images, loadUserImages, isGenerating } = useImageGeneration();
+  const { images, loadUserImages } = useImageGeneration();
   const { user } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
 
