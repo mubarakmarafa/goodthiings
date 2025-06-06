@@ -100,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('❌ Development bypass NOT activated. Email:', email, 'Password length:', password.length);
     
     try {
+      console.log('🌐 Making request to auth-signin:', `${EDGE_FUNCTIONS_URL}/auth-signin`);
+      
       const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signin`, {
         method: 'POST',
         headers: {
@@ -110,13 +112,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('📡 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       const data = await response.json();
       
-      console.log('Login response:', { status: response.status, data });
+      console.log('📦 Login response data:', { 
+        status: response.status, 
+        data,
+        responseOk: response.ok,
+        fullResponse: response
+      });
 
       if (!response.ok) {
-        console.log('Login failed with error:', data.error);
-        throw new Error(data.error || 'Login failed');
+        console.log('❌ Login failed with detailed error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: data,
+          errorMessage: data.error,
+          originalError: data.originalError,
+          errorCode: data.errorCode
+        });
+        
+        // Use the more specific error message if available
+        const errorMessage = data.originalError || data.error || 'Login failed';
+        throw new Error(errorMessage);
       }
 
       // Store user data and session

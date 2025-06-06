@@ -36,20 +36,55 @@ serve(async (req) => {
       )
     }
 
+    console.log('🔍 Attempting signin for:', email);
+    
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
+      console.log('❌ Signin error details:', {
+        message: error.message,
+        name: error.name,
+        status: error.status,
+        code: error.code,
+        details: error
+      });
+      
+      // More specific error handling
+      let errorMessage = error.message;
+      let statusCode = 401;
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        // This could be either wrong password or user doesn't exist
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and click the confirmation link before signing in.';
+        statusCode = 422;
+      } else if (error.message?.includes('Too many requests')) {
+        errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+        statusCode = 429;
+      } else if (error.message?.includes('User not found')) {
+        errorMessage = 'No account found with this email address. Please check your email or create a new account.';
+        statusCode = 404;
+      }
+      
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ 
+          error: errorMessage,
+          originalError: error.message,
+          errorCode: error.code,
+          details: 'Check console for full error details'
+        }),
         { 
-          status: 401, 
+          status: statusCode, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
+
+    console.log('✅ Signin successful for:', email);
 
     return new Response(
       JSON.stringify({
