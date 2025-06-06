@@ -172,8 +172,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (username: string, password: string, userApiKey: string) => {
+    console.log('🆕 SIGNUP function called with:', { 
+      username, 
+      usernameLength: username.length,
+      hasPassword: !!password, 
+      passwordLength: password.length,
+      hasApiKey: !!userApiKey,
+      apiKeyLength: userApiKey.length
+    });
+    
     setIsLoading(true);
     try {
+      console.log('🌐 Making signup request to:', `${EDGE_FUNCTIONS_URL}/auth-username-signup`);
+      
       const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-username-signup`, {
         method: 'POST',
         headers: {
@@ -184,13 +195,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ username, password, apiKey: userApiKey }),
       });
 
+      console.log('📡 Signup response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       const data = await response.json();
       
-      console.log('Signup response:', { status: response.status, data });
+      console.log('📦 Signup response data:', { 
+        status: response.status, 
+        data,
+        responseOk: response.ok,
+        fullResponse: response
+      });
 
       if (!response.ok) {
-        console.log('Signup failed with error:', data.error);
-        throw new Error(data.error || 'Signup failed');
+        console.log('❌ Signup failed with detailed error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: data,
+          errorMessage: data.error,
+          originalError: data.originalError
+        });
+        
+        // Better error message
+        const errorMessage = data.error || data.message || `Signup failed (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       // Store user data and session

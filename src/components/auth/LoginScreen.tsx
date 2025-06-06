@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 
 interface LoginScreenProps {
-  onLogin: (email: string, password: string, apiKey: string) => Promise<void>;
-  onSignUp: (email: string, password: string, apiKey: string) => Promise<void>;
-  onResetPassword: (email: string) => Promise<void>;
+  onLogin: (username: string, password: string, apiKey: string) => Promise<void>;
+  onSignUp: (username: string, password: string, apiKey: string) => Promise<void>;
+  onResetPassword: (username: string) => Promise<void>;
 }
 
 export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: LoginScreenProps) {
@@ -101,7 +101,15 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
     setIsLoading(true);
     
     try {
-      console.log('🔐 Starting authentication with:', { username, hasPassword: !!password, hasApiKey: !!apiKey });
+      console.log('🔐 Starting authentication with:', { 
+        username, 
+        usernameLength: username.length,
+        hasPassword: !!password, 
+        passwordLength: password.length,
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey.length,
+        apiKeyPreview: apiKey.substring(0, 10) + '...'
+      });
       
       // More robust approach: Check which HTTP status code we get
       let loginSuccessful = false;
@@ -169,6 +177,14 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
       // If login failed due to user not existing, try signup (unless force login only)
       if (!loginSuccessful && shouldTrySignup && !forceLoginOnly) {
         console.log('🆕 Login suggests user doesn\'t exist - attempting SIGNUP...');
+        console.log('🆕 SIGNUP parameters:', {
+          username,
+          usernameLength: username.length,
+          hasPassword: !!password,
+          passwordLength: password.length,
+          hasApiKey: !!apiKey,
+          apiKeyLength: apiKey.length
+        });
         toast.info('Creating your account...');
         try {
           await onSignUp(username, password, apiKey);
