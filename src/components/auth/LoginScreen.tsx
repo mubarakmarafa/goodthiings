@@ -8,7 +8,7 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,14 +16,14 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
   const [forceLoginOnly, setForceLoginOnly] = useState(false);
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      toast.error('Please enter your email address first');
+    if (!username) {
+      toast.error('Please enter your username first');
       return;
     }
 
     try {
       setIsLoading(true);
-      await onResetPassword(email);
+      await onResetPassword(username);
       toast.success('Password reset email sent! Check your inbox and follow the instructions.');
     } catch (error: any) {
       console.error('Password reset error:', error);
@@ -34,8 +34,8 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
   };
 
   const handleTestDirectAuth = async () => {
-    if (!email || !password) {
-      toast.error('Please enter email and password first');
+    if (!username || !password) {
+      toast.error('Please enter username and password first');
       return;
     }
 
@@ -44,7 +44,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
       setIsLoading(true);
       
       // Call the global test function we added to window
-      const result = await (window as any).testDirectAuth(email, password);
+      const result = await (window as any).testDirectAuth(username, password);
       
       if (result.success) {
         toast.success('✅ Direct auth SUCCESS! Issue is with Edge Functions. Check console for details.');
@@ -60,8 +60,8 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
   };
 
   const handleCheckUserStatus = async () => {
-    if (!email) {
-      toast.error('Please enter your email address first');
+    if (!username) {
+      toast.error('Please enter your username first');
       return;
     }
 
@@ -70,7 +70,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
       setIsLoading(true);
       
       // Call the global test function we added to window
-      const result = await (window as any).checkUserStatus(email);
+      const result = await (window as any).checkUserStatus(username);
       
       if (result.exists) {
         toast.success('✅ User exists and password reset sent! Check console for details.');
@@ -88,7 +88,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !apiKey) {
+    if (!username || !password || !apiKey) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -101,7 +101,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
     setIsLoading(true);
     
     try {
-      console.log('🔐 Starting authentication with:', { email, hasPassword: !!password, hasApiKey: !!apiKey });
+      console.log('🔐 Starting authentication with:', { username, hasPassword: !!password, hasApiKey: !!apiKey });
       
       // More robust approach: Check which HTTP status code we get
       let loginSuccessful = false;
@@ -109,7 +109,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
       
       try {
         console.log('🔍 Attempting LOGIN first...');
-        await onLogin(email, password, apiKey);
+        await onLogin(username, password, apiKey);
         loginSuccessful = true;
         console.log('✅ LOGIN successful!');
         toast.success('Welcome back!');

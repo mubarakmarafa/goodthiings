@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 interface User {
   id: string;
-  email: string;
+  username: string;
   last_used_style: 'handdrawn' | '3d';
 }
 
@@ -11,9 +11,9 @@ interface AuthContextType {
   user: User | null;
   apiKey: string | null;
   isLoading: boolean;
-  login: (email: string, password: string, apiKey: string) => Promise<void>;
-  signup: (email: string, password: string, apiKey: string) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  login: (username: string, password: string, apiKey: string) => Promise<void>;
+  signup: (username: string, password: string, apiKey: string) => Promise<void>;
+  resetPassword: (username: string) => Promise<void>;
   logout: () => void;
   updateApiKey: (apiKey: string) => void;
 }
@@ -77,17 +77,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, userApiKey: string) => {
-    console.log('🔍 LOGIN FUNCTION CALLED with:', { email, password: password.slice(0, 3) + '***', hasApiKey: !!userApiKey });
+  const login = async (username: string, password: string, userApiKey: string) => {
+    console.log('🔍 LOGIN FUNCTION CALLED with:', { username, password: password.slice(0, 3) + '***', hasApiKey: !!userApiKey });
     setIsLoading(true);
     
     // DEVELOPMENT BYPASS - Remove this in production!
-    if (email === 'dev@test.com' && password === 'dev123') {
+    if (username === 'dev' && password === 'dev123') {
       console.log('🚀🚀🚀 DEVELOPMENT BYPASS ACTIVATED - SUCCESS! 🚀🚀🚀');
       alert('DEVELOPMENT BYPASS ACTIVATED!'); // Make it super obvious
       const devUser: User = {
         id: 'dev-user-123',
-        email: 'dev@test.com',
+        username: 'dev',
         last_used_style: '3d',
       };
       setUser(devUser);
