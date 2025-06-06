@@ -21,3 +21,4 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+console.log('Force deployment:', new Date());
