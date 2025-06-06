@@ -156,7 +156,29 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
   componentDidMount() {
     this.isComponentMounted = true;
     this.updateGridItems();
+    this.injectHoverStyles();
   }
+
+  private injectHoverStyles = () => {
+    // Check if styles already exist
+    if (document.getElementById('thiings-grid-hover-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'thiings-grid-hover-styles';
+    style.textContent = `
+      .grid-item-hover:hover {
+        filter: none !important;
+        transition: filter 0.2s ease-in-out !important;
+        z-index: 10;
+        position: relative;
+      }
+      .grid-item-hover:hover * {
+        transform: scale(1.05);
+        transition: transform 0.2s ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+  };
 
   componentWillUnmount() {
     this.isComponentMounted = false;
@@ -164,6 +186,12 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
       cancelAnimationFrame(this.animationFrame);
     }
     this.debouncedUpdateGridItems.cancel();
+    
+    // Clean up injected styles if no other ThiingsGrid instances exist
+    const existingStyle = document.getElementById('thiings-grid-hover-styles');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
   }
 
   public publicGetCurrentPosition = () => {
@@ -469,9 +497,19 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
             const x = item.position.x * gridSize! + containerWidth / 2;
             const y = item.position.y * gridSize! + containerHeight / 2;
 
+            // Calculate distance from center for depth of field effect
+            const distanceFromCenter = Math.sqrt(
+              item.position.x * item.position.x + item.position.y * item.position.y
+            );
+            
+            // Calculate blur amount based on distance (max 4px blur)
+            const blurAmount = Math.min(distanceFromCenter * 0.8, 4);
+            const shouldBlur = distanceFromCenter > 0; // Don't blur center item
+
             return (
               <div
                 key={`${item.position.x}-${item.position.y}`}
+                className="grid-item-hover"
                 style={{
                   position: "absolute",
                   display: "flex",
@@ -484,6 +522,8 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
                   marginLeft: `-${gridSize! / 2}px`,
                   marginTop: `-${gridSize! / 2}px`,
                   willChange: "transform",
+                  filter: shouldBlur ? `blur(${blurAmount}px)` : "none",
+                  transition: "filter 0.3s ease-in-out",
                 }}
               >
                 {this.props.renderItem({

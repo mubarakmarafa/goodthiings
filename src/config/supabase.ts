@@ -1,7 +1,7 @@
 // Supabase configuration for production
 export const SUPABASE_CONFIG = {
   url: 'https://whstudldcjncgyybfezn.supabase.co',
-  anonKey: 'your_anon_key_here', // Get from Supabase Dashboard > Settings > API
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indoc3R1ZGxkY2puY2d5eWJmZXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNDE4MjEsImV4cCI6MjA2NDcxNzgyMX0.carn2tL9vdzIF6DlL3SF1jqMQppSj_Y_9FHgjunVVIE', // Get from Supabase Dashboard > Settings > API
   
   // Edge Function URLs
   functions: {
