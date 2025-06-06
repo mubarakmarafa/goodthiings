@@ -59,56 +59,14 @@ export default function UserInput() {
     }
 
     const gridPosition = generateRandomPosition();
-    const loadingId = `loading-${Date.now()}`;
     console.log('🎯 Generating image at position:', gridPosition);
 
     try {
-      
-      // Create loading cell immediately
-      const loadingCell = document.createElement('div');
-      loadingCell.id = loadingId;
-      loadingCell.style.position = 'absolute';
-      loadingCell.style.width = '160px';
-      loadingCell.style.height = '160px';
-      loadingCell.style.left = `${gridPosition.x * 160}px`;
-      loadingCell.style.top = `${gridPosition.y * 160}px`;
-      loadingCell.style.zIndex = '1000';
-      loadingCell.innerHTML = `
-        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 8px; border: 2px dashed #d1d5db;">
-          <div style="text-align: center;">
-            <div style="width: 32px; height: 32px; border: 2px solid #3b82f6; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 8px;"></div>
-            <div style="font-size: 12px; color: #6b7280; font-weight: 500;">adding thing</div>
-          </div>
-        </div>
-      `;
-      
-      // Add CSS animation if not already added
-      if (!document.querySelector('#spin-animation')) {
-        const style = document.createElement('style');
-        style.id = 'spin-animation';
-        style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
-        document.head.appendChild(style);
-      }
-      
-      // Add loading cell to page
-      document.body.appendChild(loadingCell);
-      
-      // Pan to the loading cell using window.focusOnImage if available
-      if ((window as any).focusOnImage) {
-        (window as any).focusOnImage(gridPosition.x, gridPosition.y);
-      }
-      
       // Show immediate feedback
       toast.loading('Creating your image...', { id: 'generating' });
 
-      // Generate the image
+      // Generate the image (this will handle loading state internally)
       const newImage = await generateImage(inputValue, selectedStyle, gridPosition);
-      
-      // Remove loading cell
-      const loadingElement = document.getElementById(loadingId);
-      if (loadingElement) {
-        loadingElement.remove();
-      }
       
       // Clear the input
       setInputValue('');
@@ -118,17 +76,17 @@ export default function UserInput() {
       
       console.log('🎉 Image generated successfully:', newImage);
 
-      // The new image should automatically appear in the grid via the useEffect in ThiingsGridContainer
+      // Auto-pan to and select the new image (retry logic handles timing)
+      console.log('🎯 UserInput: Will trigger auto-focus for:', newImage.id);
+      if ((window as any).focusOnNewImage) {
+        console.log('🚀 UserInput: Calling focusOnNewImage for:', newImage.id);
+        (window as any).focusOnNewImage(newImage.id, gridPosition.x, gridPosition.y);
+      } else {
+        console.log('❌ UserInput: focusOnNewImage function not available on window');
+      }
 
     } catch (error: any) {
       console.error('Failed to generate image:', error);
-      
-      // Remove loading cell on error
-      const loadingElement = document.getElementById(loadingId);
-      if (loadingElement) {
-        loadingElement.remove();
-      }
-      
       toast.error(error.message || 'Failed to generate image', { id: 'generating' });
     }
   };

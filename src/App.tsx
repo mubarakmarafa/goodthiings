@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/auth/LoginScreen";
 import ThiingsGridContainer from "./components/ThiingsGridContainer";
 import UserInput from "./components/UserInput";
+import LogoutButton from "./components/LogoutButton";
 import { Toaster } from 'sonner';
 
 function AppContent() {
@@ -27,6 +28,7 @@ function AppContent() {
 
   return (
     <div className="h-screen w-screen font-sans">
+      <LogoutButton />
       <ThiingsGridContainer />
       <UserInput />
     </div>

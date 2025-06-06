@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SUPABASE_URL = 'https://whstudldcjncgyybfezn.supabase.co';
@@ -35,6 +35,28 @@ export const useImageGeneration = () => {
       throw new Error('Please enter a prompt');
     }
 
+    // Create loading image first
+    const loadingImage: GeneratedImage = {
+      id: `loading-${Date.now()}`,
+      user_id: user.id,
+      prompt: prompt.trim(),
+      enhanced_prompt: `Loading: ${prompt.trim()}`,
+      style_type: styleType,
+      image_url: '',
+      grid_position_x: gridPosition.x,
+      grid_position_y: gridPosition.y,
+      generation_status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+
+    // Add loading image to state immediately
+    console.log('🔄 Adding loading image to state:', loadingImage);
+    setImages(prev => {
+      const newImages = [loadingImage, ...prev];
+      console.log('🔄 Updated images state (after adding loading):', newImages.length, 'images');
+      return newImages;
+    });
+
     // Check if using development bypass
     const isDevMode = user.id === 'dev-user-123';
     if (isDevMode) {
@@ -57,7 +79,14 @@ export const useImageGeneration = () => {
         created_at: new Date().toISOString(),
       };
       
-      setImages(prev => [fakeImage, ...prev]);
+      // Replace loading image with completed image
+      console.log('🔄 Replacing loading image with completed image:', fakeImage);
+      setImages(prev => {
+        const updatedImages = prev.map(img => img.id === loadingImage.id ? fakeImage : img);
+        console.log('🔄 Updated images state (after replacement):', updatedImages.length, 'images');
+        console.log('🔄 All image IDs:', updatedImages.map(img => img.id));
+        return updatedImages;
+      });
       console.log('✅ Development image generated:', fakeImage);
       return fakeImage;
     }
@@ -93,11 +122,14 @@ export const useImageGeneration = () => {
       console.log('✅ Image generated successfully:', data);
 
       const newImage = data.image as GeneratedImage;
-      setImages(prev => [newImage, ...prev]);
+      // Replace loading image with completed image
+      setImages(prev => prev.map(img => img.id === loadingImage.id ? newImage : img));
 
       return newImage;
     } catch (error) {
       console.error('❌ Image generation failed:', error);
+      // Remove loading image on error
+      setImages(prev => prev.filter(img => img.id !== loadingImage.id));
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error - please check your internet connection');
       }
@@ -107,8 +139,16 @@ export const useImageGeneration = () => {
     }
   };
 
-  const loadUserImages = async () => {
+  const loadUserImages = useCallback(async () => {
     if (!user) return;
+
+    // Check if using development bypass
+    const isDevMode = user.id === 'dev-user-123';
+    if (isDevMode) {
+      console.log('🚧 Development mode - skipping image loading from server');
+      setImages([]); // Start with empty images in dev mode
+      return;
+    }
 
     try {
       console.log('📚 Loading user images...');
@@ -130,7 +170,7 @@ export const useImageGeneration = () => {
     } catch (error) {
       console.error('❌ Failed to load images:', error);
     }
-  };
+  }, [user]);
 
   return {
     generateImage,

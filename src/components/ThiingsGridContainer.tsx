@@ -1,5 +1,5 @@
-import { useRef, useState, useEffect, useCallback } from "react";
-import { useImageGeneration } from '../hooks/useImageGeneration';
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
 import { useAuth } from '../contexts/AuthContext';
 import ThiingsGrid, { type ItemConfig } from "../../lib/ThiingsGrid";
 
@@ -149,24 +149,28 @@ const ThiingsItemCell = ({ gridIndex, position, isMoving, item, onFocus }: Thiin
   );
 };
 
-export const ThiingsGridContainer = () => {
+interface ThiingsGridContainerLogicProps {
+  images: GeneratedImage[];
+  loadUserImages: () => Promise<void>;
+}
+
+const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContainerLogicProps) => {
   const gridRef = useRef<any>(null);
   const [, forceUpdate] = useState(0);
   const lastGridPositionRef = useRef({ x: 0, y: 0 });
   
-  const { images, loadUserImages } = useImageGeneration();
-  const { user } = useAuth();
   const [gridItems, setGridItems] = useState<GridItem[]>([]);
 
   // Load user images on mount
   useEffect(() => {
-    if (user) {
-      loadUserImages();
-    }
-  }, [user, loadUserImages]);
+    loadUserImages();
+  }, [loadUserImages]);
 
   // Generate initial static items and update when generated images change
   useEffect(() => {
+    console.log('🔄 GRID ITEMS USEEFFECT RUNNING. Images count:', images.length);
+    console.log('📋 Current images array:', images);
+    
     const items: GridItem[] = [];
     
     // Create a map to track generated image positions
@@ -197,27 +201,48 @@ export const ThiingsGridContainer = () => {
     }
 
     // Add generated images (these will overlay the static grid)
+    console.log('🔍 Processing', images.length, 'generated images for grid');
     images.forEach((image) => {
-      items.push({
+      const gridItem: GridItem = {
         id: `generated-${image.id}`,
-        type: 'generated',
+        type: image.generation_status === 'pending' ? 'loading' : 'generated',
         gridX: image.grid_position_x,
         gridY: image.grid_position_y,
         imageUrl: image.image_url,
         prompt: image.prompt,
         styleType: image.style_type,
-      });
+      };
+      console.log('➕ Adding generated item to grid:', gridItem);
+      items.push(gridItem);
     });
 
+    console.log('✅ Total grid items:', items.length, 'Generated items:', images.length);
+    console.log('🔧 About to setGridItems. Previous gridItems count:', gridItems.length);
     setGridItems(items);
+    console.log('✅ setGridItems called with', items.length, 'items');
+    
+    console.log('🏁 GRID ITEMS USEEFFECT COMPLETE');
   }, [images]);
 
+  // Debug: Track gridItems state changes
+  useEffect(() => {
+    console.log('📊 GRIDITEM STATE CHANGED. New count:', gridItems.length);
+    console.log('📋 GridItems state contains generated items:', gridItems.filter(item => item.id.startsWith('generated-')).map(item => item.id));
+  }, [gridItems]);
+
   // Convert gridItems to indexed format for ThiingsGrid
-  const itemConfigs = gridItems.map((item, index) => ({
-    gridIndex: index,
-    position: { x: item.gridX, y: item.gridY },
-    item,
-  }));
+  const itemConfigs = useMemo(() => {
+    console.log('🔄 ITEMCONFIGS USEMEMO RUNNING. GridItems count:', gridItems.length);
+    console.log('🔍 GridItems input to useMemo:', gridItems.slice(0, 5).map(item => ({ id: item.id, type: item.type, pos: `${item.gridX},${item.gridY}` })));
+    const configs = gridItems.map((item, index) => ({
+      gridIndex: index,
+      position: { x: item.gridX, y: item.gridY },
+      item,
+    }));
+    console.log('✅ ItemConfigs created. Count:', configs.length);
+    console.log('📋 Generated items in configs:', configs.filter(c => c.item.id.startsWith('generated-')).map(c => c.item.id));
+    return configs;
+  }, [gridItems]);
 
   // Function to smoothly animate to center an image
   const focusOnImage = useCallback((gridX: number, gridY: number) => {
@@ -276,6 +301,73 @@ export const ThiingsGridContainer = () => {
     requestAnimationFrame(animateToPosition);
   }, []);
 
+  // Function to focus on and select a new image by ID with retry logic
+  const focusOnNewImage = useCallback((imageId: string, gridX: number, gridY: number, retryCount = 0) => {
+    console.log(`🎯 Focusing on new image (attempt ${retryCount + 1}):`, imageId, 'at position:', gridX, gridY);
+    console.log('🔍 ItemConfigs available for search. Count:', itemConfigs.length);
+    console.log('🔍 Generated items in itemConfigs:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).map(c => c.item.id));
+    console.log('🔍 Looking for ID:', `generated-${imageId}`);
+    
+    // Find the grid index of this image
+    const imageIndex = itemConfigs.findIndex(config => config.item.id === `generated-${imageId}`);
+    console.log('🔍 Found image index:', imageIndex);
+    
+    if (imageIndex !== -1) {
+      // Found it! Set selection state
+      selectedImageState = {
+        gridIndex: imageIndex,
+        position: { x: gridX, y: gridY },
+        isSelected: true,
+        isAnimating: true
+      };
+      
+      console.log('🚀 Setting selection state and panning to:', { gridX, gridY });
+      
+      // Pan to the image
+      focusOnImage(gridX, gridY);
+      
+      console.log('✅ Auto-selected new image at index:', imageIndex);
+      
+      // Force a re-render to ensure selection is visible
+      forceUpdate(prev => prev + 1);
+    } else if (retryCount < 10) {
+      // Not found yet, retry in 100ms (max 10 attempts = 1 second total)
+      console.log(`⏳ Image not found yet, retrying in 100ms (attempt ${retryCount + 1}/10)`);
+      setTimeout(() => {
+        focusOnNewImage(imageId, gridX, gridY, retryCount + 1);
+      }, 100);
+    } else {
+      // Give up after 1 second
+      console.log('❌ Could not find image after 10 attempts. Available IDs:', itemConfigs.slice(0, 5).map(c => c.item.id));
+    }
+  }, [itemConfigs, focusOnImage, forceUpdate]);
+
+  // Auto-select and pan to newest completed image
+  useEffect(() => {
+    if (images.length > 0) {
+      const newestImage = images[0]; // Most recent image
+      console.log('🔍 Checking newest image:', newestImage);
+      
+      if (newestImage.generation_status === 'completed' && newestImage.id.startsWith('dev-')) {
+        console.log('✅ Found completed dev image, will auto-focus with retry logic');
+        
+        // Start trying immediately - retry logic will handle timing
+        focusOnNewImage(newestImage.id, newestImage.grid_position_x, newestImage.grid_position_y);
+      }
+    }
+  }, [images, focusOnNewImage]);
+
+  // Make functions available globally
+  useEffect(() => {
+    (window as any).focusOnImage = focusOnImage;
+    (window as any).focusOnNewImage = focusOnNewImage;
+    
+    return () => {
+      delete (window as any).focusOnImage;
+      delete (window as any).focusOnNewImage;
+    };
+  }, [focusOnImage, focusOnNewImage]);
+
   // Handle clicking on empty space to deselect
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget && selectedImageState.isSelected) {
@@ -316,6 +408,7 @@ export const ThiingsGridContainer = () => {
       lastGridPositionRef.current = { x: initialOffset.x, y: initialOffset.y };
     }
 
+    let lastUpdateTime = 0;
     const updateCenterPosition = () => {
       if (gridRef.current && gridRef.current.publicGetCurrentPosition) {
         const offset = gridRef.current.publicGetCurrentPosition();
@@ -343,8 +436,13 @@ export const ThiingsGridContainer = () => {
         const centerX = -Math.round(offset.x / CONFIG.gridSize);
         const centerY = -Math.round(offset.y / CONFIG.gridSize);
         
-        currentCenterPosition = { x: centerX, y: centerY };
-        forceUpdate(prev => prev + 1);
+        // Only update if center position actually changed (throttled to 30fps)
+        const now = Date.now();
+        if ((currentCenterPosition.x !== centerX || currentCenterPosition.y !== centerY) && now - lastUpdateTime > 33) {
+          currentCenterPosition = { x: centerX, y: centerY };
+          lastUpdateTime = now;
+          forceUpdate(prev => prev + 1);
+        }
       }
     };
 
@@ -361,7 +459,7 @@ export const ThiingsGridContainer = () => {
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, []);
+  }, []); // Cleanup handled by wrapper component
 
   // Custom render function that passes the item data
   const renderGridItem = useCallback((config: ItemConfig) => {
@@ -516,6 +614,28 @@ export const ThiingsGridContainer = () => {
       })()}
     </div>
   );
+};
+
+// Wrapper component that only renders the logic when user exists
+export const ThiingsGridContainer = () => {
+  const { user } = useAuth();
+  const { images, loadUserImages } = useImageGeneration();
+
+  // Only render heavy components when user exists
+  if (!user) {
+    // Reset global state when no user
+    currentCenterPosition = { x: 0, y: 0 };
+    selectedImageState = {
+      gridIndex: null,
+      position: null,
+      isSelected: false,
+      isAnimating: false
+    };
+    imageInteractionInProgress = false;
+    return null;
+  }
+
+  return <ThiingsGridContainerLogic images={images} loadUserImages={loadUserImages} />;
 };
 
 export default ThiingsGridContainer; 
