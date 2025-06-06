@@ -56,80 +56,126 @@ serve(async (req) => {
       )
     }
 
-    // Generate image with OpenAI DALL-E 3
+    // Generate image with OpenAI (trying multiple models)
     console.log('Making OpenAI request with:', {
-      model: 'dall-e-3',
       prompt: enhancedPrompt.substring(0, 100) + '...',
       apiKeyPrefix: userApiKey.substring(0, 10) + '...',
-      promptLength: enhancedPrompt.length
+      promptLength: enhancedPrompt.length,
+      availableModels: ['gpt-image-1', 'dall-e-3', 'dall-e-2']
     });
 
-    // Try DALL-E 3 first, fallback to DALL-E 2 if access issues
+    // Try models in order: gpt-image-1 (newest) -> DALL-E 3 -> DALL-E 2
     let openaiResponse;
-    let modelUsed = 'dall-e-3';
-    
-    try {
-      openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${userApiKey}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Supabase-Edge-Function/1.0'
-        },
-        body: JSON.stringify({
+    let modelUsed = 'gpt-image-1';
+    const models = [
+      {
+        name: 'gpt-image-1',
+        body: {
+          model: 'gpt-image-1',
+          prompt: enhancedPrompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'high', // 'low', 'medium', 'high' for gpt-image-1
+          response_format: 'url'
+        }
+      },
+      {
+        name: 'dall-e-3',
+        body: {
           model: 'dall-e-3',
           prompt: enhancedPrompt,
           n: 1,
           size: '1024x1024',
-          quality: 'hd',
+          quality: 'hd', // 'standard' or 'hd' for DALL-E 3
+          style: 'vivid', // 'natural' or 'vivid' for DALL-E 3
           response_format: 'url'
-        })
-      });
+        }
+      },
+      {
+        name: 'dall-e-2',
+        body: {
+          model: 'dall-e-2',
+          prompt: enhancedPrompt.substring(0, 1000), // DALL-E 2 has shorter prompt limit
+          n: 1,
+          size: '1024x1024',
+          response_format: 'url'
+        }
+      }
+    ];
 
-      console.log('DALL-E 3 response status:', openaiResponse.status);
-      
-      // If DALL-E 3 fails with 400/403, try DALL-E 2
-      if (!openaiResponse.ok && (openaiResponse.status === 400 || openaiResponse.status === 403)) {
-        const errorBody = await openaiResponse.text();
-        console.log('DALL-E 3 failed, trying DALL-E 2. Error:', errorBody);
+    let lastError = null;
+    
+    for (const modelConfig of models) {
+      try {
+        console.log(`Trying ${modelConfig.name}...`);
         
-        // Try DALL-E 2 as fallback
         openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${userApiKey}`,
             'Content-Type': 'application/json',
-            'User-Agent': 'Supabase-Edge-Function/1.0'
+            'User-Agent': 'ThiingsGrid-AI/1.0'
           },
-          body: JSON.stringify({
-            model: 'dall-e-2',
-            prompt: enhancedPrompt.substring(0, 1000), // DALL-E 2 has shorter prompt limit
-            n: 1,
-            size: '1024x1024',
-            response_format: 'url'
-          })
+          body: JSON.stringify(modelConfig.body)
         });
-        
-        modelUsed = 'dall-e-2';
-        console.log('DALL-E 2 response status:', openaiResponse.status);
-      }
 
-    } catch (fetchError) {
-      console.error('Network error calling OpenAI:', fetchError);
-      throw new Error(`Network error calling OpenAI: ${fetchError.message}`);
+        console.log(`${modelConfig.name} response status:`, openaiResponse.status);
+        
+        if (openaiResponse.ok) {
+          modelUsed = modelConfig.name;
+          break; // Success, exit the loop
+        } else {
+          const errorBody = await openaiResponse.text();
+          console.log(`${modelConfig.name} failed:`, errorBody);
+          lastError = errorBody;
+          
+          // Don't try next model if it's a content filter error (these won't work on any model)
+          try {
+            const errorJson = JSON.parse(errorBody);
+            if (errorJson.error?.code === 'content_filter' || 
+                errorJson.error?.type === 'image_generation_user_error' ||
+                errorJson.error?.code === 'contentFilter') {
+              console.log('Content filter error detected, not trying other models');
+              console.log('Error details:', errorJson.error);
+              lastError = errorBody;
+              break;
+            }
+          } catch (e) {
+            // Continue to next model if we can't parse the error
+          }
+        }
+      } catch (fetchError) {
+        console.error(`Network error with ${modelConfig.name}:`, fetchError);
+        lastError = fetchError.message;
+        continue; // Try next model
+      }
     }
 
-    if (!openaiResponse.ok) {
-      const errorBody = await openaiResponse.text();
-      console.error('OpenAI API error details:', errorBody);
+    // Check if we got a successful response from any model
+    if (!openaiResponse || !openaiResponse.ok) {
+      console.error('All models failed. Last error:', lastError);
       
-      // Parse error for better user feedback
-      try {
-        const errorJson = JSON.parse(errorBody);
-        const errorMessage = errorJson.error?.message || errorBody;
-        throw new Error(`OpenAI API error (${openaiResponse.status}): ${errorMessage}`);
-      } catch {
-        throw new Error(`OpenAI API error (${openaiResponse.status}): ${errorBody}`);
+      // Try to parse the last error for better user feedback
+      if (lastError) {
+        try {
+          const errorJson = JSON.parse(lastError);
+          
+          // Handle content moderation errors specifically
+          if (errorJson.error?.code === 'content_filter' || 
+              errorJson.error?.type === 'image_generation_user_error' ||
+              errorJson.error?.code === 'contentFilter') {
+            throw new Error('Your prompt was flagged by the content moderation system. Please try a different, more general description.');
+          }
+          
+          // Handle other API errors
+          const errorMessage = errorJson.error?.message || lastError;
+          throw new Error(`OpenAI API error: ${errorMessage}`);
+        } catch (parseError) {
+          // If we can't parse as JSON, return the raw error
+          throw new Error(`OpenAI API error: ${lastError}`);
+        }
+      } else {
+        throw new Error('OpenAI API error: All image generation models failed');
       }
     }
 
