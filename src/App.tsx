@@ -1,7 +1,7 @@
 // GoodThiings AI - Main App Component (TypeScript fixes applied)
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoginScreen from "./components/auth/LoginScreen";
-import ThiingsIcons from "./examples/ThiingsIcons";
+import ThiingsGridContainer from "./components/ThiingsGridContainer";
 import UserInput from "./components/UserInput";
 import { Toaster } from 'sonner';
 
@@ -27,7 +27,7 @@ function AppContent() {
 
   return (
     <div className="h-screen w-screen font-sans">
-      <ThiingsIcons />
+      <ThiingsGridContainer />
       <UserInput />
     </div>
   );
