@@ -33,6 +33,32 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
     }
   };
 
+  const handleTestDirectAuth = async () => {
+    if (!email || !password) {
+      toast.error('Please enter email and password first');
+      return;
+    }
+
+    console.log('🧪 Starting direct auth test...');
+    try {
+      setIsLoading(true);
+      
+      // Call the global test function we added to window
+      const result = await (window as any).testDirectAuth(email, password);
+      
+      if (result.success) {
+        toast.success('✅ Direct auth SUCCESS! Issue is with Edge Functions. Check console for details.');
+      } else {
+        toast.error('❌ Direct auth FAILED. Issue is with Supabase/credentials. Check console for details.');
+      }
+    } catch (error: any) {
+      console.error('Direct auth test error:', error);
+      toast.error('Test failed: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -350,8 +376,8 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                 </label>
               </div>
               
-              {/* Forgot Password Link */}
-              <div className="flex justify-center px-2 mt-2">
+              {/* Helper Actions */}
+              <div className="flex flex-col items-center gap-2 px-2 mt-2">
                 <button
                   type="button"
                   onClick={handleForgotPassword}
@@ -359,6 +385,16 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                   className="text-sm text-[#6AADFF] hover:text-[#5A9AEF] underline disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Forgot Password?
+                </button>
+                
+                {/* Debug Test Button */}
+                <button
+                  type="button"
+                  onClick={handleTestDirectAuth}
+                  disabled={isLoading || !email || !password}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  🧪 Test Direct Auth (Debug)
                 </button>
               </div>
             </div>

@@ -246,6 +246,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // TEST FUNCTION: Direct Supabase Auth (bypassing Edge Functions)
+  const testDirectAuth = async (email: string, password: string) => {
+    console.log('🧪 TESTING DIRECT SUPABASE AUTH - bypassing Edge Functions');
+    
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ 
+          email,
+          password 
+        }),
+      });
+
+      const data = await response.json();
+      
+      console.log('🧪 Direct Supabase auth response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (response.ok) {
+        console.log('✅ DIRECT AUTH SUCCESS - Issue is with Edge Functions!');
+        return { success: true, data };
+      } else {
+        console.log('❌ DIRECT AUTH FAILED - Issue is with Supabase/credentials');
+        return { success: false, error: data };
+      }
+    } catch (error) {
+      console.error('🧪 Direct auth test error:', error);
+      return { success: false, error: error };
+    }
+  };
+
+  // Add this to window for manual testing
+  if (typeof window !== 'undefined') {
+    (window as any).testDirectAuth = testDirectAuth;
+  }
+
   const logout = () => {
     setUser(null);
     setApiKey(null);
