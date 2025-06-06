@@ -136,6 +136,7 @@ export const ThiingsIcons = () => {
     const duration = 800; // 800ms animation
     const startX = currentOffset.x;
     const startY = currentOffset.y;
+    let lastUpdateTime = 0;
     
     const animateToPosition = () => {
       const elapsed = Date.now() - startTime;
@@ -156,6 +157,13 @@ export const ThiingsIcons = () => {
           restPos: { x: currentX, y: currentY },
           velocity: { x: 0, y: 0 }
         });
+        
+        // Force grid to recalculate visible items during animation (throttled to ~15fps)
+        const now = Date.now();
+        if (gridRef.current.publicForceUpdate && now - lastUpdateTime > 66) {
+          gridRef.current.publicForceUpdate();
+          lastUpdateTime = now;
+        }
       }
       
       if (progress < 1) {
@@ -164,6 +172,12 @@ export const ThiingsIcons = () => {
         // Animation completed - show floating image and reset position tracking
         selectedImageState.isAnimating = false;
         lastGridPositionRef.current = { x: currentX, y: currentY };
+        
+        // Final update to ensure all images are loaded after centering
+        if (gridRef.current && gridRef.current.publicForceUpdate) {
+          gridRef.current.publicForceUpdate();
+        }
+        
         forceUpdate(prev => prev + 1);
       }
     };

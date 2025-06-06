@@ -198,6 +198,11 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
     return this.state.offset;
   };
 
+  public publicForceUpdate = () => {
+    // Force immediate grid item recalculation
+    this.updateGridItems();
+  };
+
   private calculateVisiblePositions = (): Position[] => {
     if (!this.containerRef.current) return [];
 
