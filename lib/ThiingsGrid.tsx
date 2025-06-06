@@ -497,14 +497,29 @@ class ThiingsGrid extends Component<ThiingsGridProps, State> {
             const x = item.position.x * gridSize! + containerWidth / 2;
             const y = item.position.y * gridSize! + containerHeight / 2;
 
-            // Calculate distance from center for depth of field effect
-            const distanceFromCenter = Math.sqrt(
-              item.position.x * item.position.x + item.position.y * item.position.y
+            // Calculate the visual center of the viewport (same logic as scaling)
+            const viewportCenterX = -Math.round(this.state.offset.x / gridSize!);
+            const viewportCenterY = -Math.round(this.state.offset.y / gridSize!);
+
+            // Calculate distance from the visual center (not grid origin)
+            const distanceFromVisualCenter = Math.sqrt(
+              Math.pow(item.position.x - viewportCenterX, 2) + 
+              Math.pow(item.position.y - viewportCenterY, 2)
             );
             
-            // Calculate blur amount based on distance (max 4px blur)
-            const blurAmount = Math.min(distanceFromCenter * 0.8, 4);
-            const shouldBlur = distanceFromCenter > 0; // Don't blur center item
+            // Calculate blur amount based on visual distance with smooth falloff
+            // Use a more gradual curve: items within 1 grid cell stay sharp, then progressive blur
+            const blurRadius = 3; // Distance where max blur is reached
+            const maxBlur = 4; // Maximum blur amount in pixels
+            const sharpRadius = 0.5; // Keep items within this distance completely sharp
+            
+            let blurAmount = 0;
+            if (distanceFromVisualCenter > sharpRadius) {
+              const blurFactor = Math.min((distanceFromVisualCenter - sharpRadius) / blurRadius, 1);
+              blurAmount = blurFactor * maxBlur;
+            }
+            
+            const shouldBlur = blurAmount > 0;
 
             return (
               <div
