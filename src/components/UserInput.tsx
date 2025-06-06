@@ -129,44 +129,44 @@ export default function UserInput() {
       >
         <div className="overflow-hidden h-full">
           {previewImage ? (
-            // Preview state - show generated image with save/discard options (Figma design)
-            <div className="flex flex-col h-full">
-                             {/* Blue Header Banner */}
-               <div className="bg-[#6AADFF] rounded-t-3xl px-6 py-4 text-center">
-                 <p className="text-white text-[16px] font-semibold">
-                   Here's your {previewImage.prompt}
-                 </p>
-               </div>
-               
-               {/* White Content Area */}
-               <div className="bg-white px-8 pt-8 pb-6 flex flex-col rounded-b-3xl" style={{ height: 'calc(100% - 56px)' }}>
-                 {/* Generated Image - Large and Prominent */}
-                 <div className="flex-1 flex items-center justify-center mb-8">
-                   <div className="flex items-center justify-center" style={{ maxWidth: '180px', maxHeight: '180px' }}>
-                     <img 
-                       src={previewImage.image_url} 
-                       alt={previewImage.prompt}
-                       className="max-w-full max-h-full object-contain drop-shadow-lg"
-                     />
-                   </div>
-                 </div>
-                 
-                 {/* Action Buttons */}
-                 <div className="flex gap-3">
-                   <button
-                     onClick={handleDiscardImage}
-                     className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
-                   >
-                     Discard
-                   </button>
-                   <button
-                     onClick={handleSaveImage}
-                     className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
-                   >
-                     Save
-                   </button>
-                 </div>
-               </div>
+                        // Preview state - show generated image with save/discard options (Figma design)
+            <div className="flex flex-col h-full p-1">
+              {/* Blue Header Banner with 5px margin */}
+              <div className="bg-[#6AADFF] rounded-2xl px-6 py-4 text-center mb-1">
+                <p className="text-white text-[16px] font-semibold">
+                  Here's your {previewImage.prompt}
+                </p>
+              </div>
+              
+              {/* White Content Area */}
+              <div className="bg-white px-8 pt-6 flex flex-col flex-1">
+                {/* Generated Image - Large and Prominent */}
+                <div className="flex-1 flex items-center justify-center mb-6">
+                  <div className="flex items-center justify-center" style={{ maxWidth: '180px', maxHeight: '180px' }}>
+                    <img 
+                      src={previewImage.image_url} 
+                      alt={previewImage.prompt}
+                      className="max-w-full max-h-full object-contain drop-shadow-lg"
+                    />
+                  </div>
+                </div>
+                
+                {/* Action Buttons with 5px margin all around */}
+                <div className="flex gap-3 pb-1">
+                  <button
+                    onClick={handleDiscardImage}
+                    className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    onClick={handleSaveImage}
+                    className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
           ) : isDropdownOpen ? (
             // Dropdown state - show style options
