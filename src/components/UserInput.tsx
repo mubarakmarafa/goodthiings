@@ -120,7 +120,7 @@ export default function UserInput() {
       <div
         className={`bg-white relative rounded-3xl w-[378px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.15)] border-2 border-[rgba(213,213,213,0.5)] transition-all duration-300 ease-in-out ${
           previewImage 
-            ? 'h-[340px]' // Expanded for preview with header
+            ? 'h-[380px]' // Expanded for preview with header
             : isDropdownOpen 
             ? 'h-[140px]' // Style dropdown
             : 'h-[70px]'  // Normal input

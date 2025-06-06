@@ -70,9 +70,9 @@ export const useImageGeneration = () => {
         id: `dev-${Date.now()}`,
         user_id: user.id,
         prompt: prompt.trim(),
-        enhanced_prompt: `${styleType === '3d' ? '3D rendered, high quality, modern digital art style: ' : 'Hand-drawn illustration, sketch style, artistic: '}${prompt.trim()}`,
+        enhanced_prompt: `[DEV PREVIEW] ${styleType === '3d' ? '3D rendered, high quality, modern digital art style: ' : 'Hand-drawn illustration, sketch style, artistic: '}${prompt.trim()}`,
         style_type: styleType,
-        image_url: `/thiings/${Math.floor(Math.random() * 9) + 1}.png`, // Random sample image
+        image_url: `/thiings/1.png`, // Development placeholder (apple icon)
         grid_position_x: gridPosition.x,
         grid_position_y: gridPosition.y,
         generation_status: 'completed',
