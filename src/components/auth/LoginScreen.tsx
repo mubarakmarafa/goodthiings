@@ -12,6 +12,7 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
   const [apiKey, setApiKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [forceLoginOnly, setForceLoginOnly] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,21 +30,33 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
     setIsLoading(true);
     
     try {
-      console.log('Starting authentication with:', { email, hasPassword: !!password, hasApiKey: !!apiKey });
+      console.log('🔐 Starting authentication with:', { email, hasPassword: !!password, hasApiKey: !!apiKey });
       
       // More robust approach: Check which HTTP status code we get
       let loginSuccessful = false;
       let shouldTrySignup = false;
       
       try {
+        console.log('🔍 Attempting LOGIN first...');
         await onLogin(email, password, apiKey);
         loginSuccessful = true;
+        console.log('✅ LOGIN successful!');
         toast.success('Welcome back!');
       } catch (loginError: any) {
-        console.log('Login failed with error:', loginError.message);
+        console.log('❌ LOGIN failed with error:', {
+          message: loginError.message,
+          status: loginError.status,
+          errorObject: loginError
+        });
         
         // More robust error detection for different environments
         const errorMsg = loginError.message?.toLowerCase() || '';
+        
+        console.log('🔍 Analyzing login error:', {
+          originalMessage: loginError.message,
+          lowerCaseMessage: errorMsg,
+          status: loginError.status
+        });
         
         // Check for various forms of "user not found" or "invalid credentials"
         if (errorMsg.includes('invalid login credentials') || 
@@ -55,31 +68,41 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
             errorMsg.includes('401') ||
             loginError.status === 401) {
           
+          console.log('🎯 Error indicates user not found - will try SIGNUP');
           shouldTrySignup = true;
           
         } else if (errorMsg.includes('email not confirmed') || 
                    errorMsg.includes('confirm your email') ||
                    errorMsg.includes('verify your email')) {
+          console.log('📧 Email confirmation required');
           toast.error('Please check your email and click the confirmation link, then try again.');
           throw loginError;
         } else if (errorMsg.includes('too many') || errorMsg.includes('rate limit')) {
+          console.log('⏳ Rate limit hit');
           toast.error('Too many attempts. Please wait a moment and try again.');
           throw loginError;
         } else {
           // For other errors (like wrong password), don't try signup
+          console.log('🚫 Other login error - NOT trying signup:', loginError.message);
           toast.error(`Login failed: ${loginError.message}`);
           throw loginError;
         }
       }
       
-      // If login failed due to user not existing, try signup
-      if (!loginSuccessful && shouldTrySignup) {
+      // If login failed due to user not existing, try signup (unless force login only)
+      if (!loginSuccessful && shouldTrySignup && !forceLoginOnly) {
+        console.log('🆕 Login suggests user doesn\'t exist - attempting SIGNUP...');
         toast.info('Creating your account...');
         try {
           await onSignUp(email, password, apiKey);
+          console.log('✅ SIGNUP successful!');
           toast.success('Account created successfully! Welcome to GoodThiings!');
         } catch (signupError: any) {
-          console.log('Signup also failed:', signupError.message);
+          console.log('❌ SIGNUP also failed:', {
+            message: signupError.message,
+            status: signupError.status,
+            errorObject: signupError
+          });
           
           const signupErrorMsg = signupError.message?.toLowerCase() || '';
           
@@ -99,6 +122,10 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
           }
           throw signupError;
         }
+      } else if (!loginSuccessful && shouldTrySignup && forceLoginOnly) {
+        // User has force login enabled but login failed
+        console.log('🔒 Force login enabled - not attempting signup');
+        toast.error('Login failed. Please check your email and password, or uncheck "I have an existing account" to create a new account.');
       }
       
     } catch (error: any) {
@@ -278,6 +305,24 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
                   required
                   disabled={isLoading}
                 />
+              </div>
+              
+              {/* Force Login Only Toggle */}
+              <div className="flex items-center gap-2 px-2 mt-1">
+                <input
+                  type="checkbox"
+                  id="forceLoginOnly"
+                  checked={forceLoginOnly}
+                  onChange={(e) => setForceLoginOnly(e.target.checked)}
+                  className="w-4 h-4 text-[#6AADFF] bg-gray-100 border-gray-300 rounded focus:ring-[#6AADFF] focus:ring-2"
+                  disabled={isLoading}
+                />
+                <label 
+                  htmlFor="forceLoginOnly" 
+                  className="text-sm font-medium text-gray-700 cursor-pointer"
+                >
+                  I have an existing account (login only)
+                </label>
               </div>
             </div>
           </div>
