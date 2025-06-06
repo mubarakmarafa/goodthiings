@@ -19,8 +19,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Get API URL from environment variables
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use Supabase Edge Functions for authentication
+const SUPABASE_URL = 'https://whstudldcjncgyybfezn.supabase.co';
+const EDGE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
 // API Key storage utilities (localStorage)
 const API_KEY_STORAGE_KEY = 'goodthiings_api_key';
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string, userApiKey: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/signin`, {
+      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string, userApiKey: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/signup`, {
+      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
