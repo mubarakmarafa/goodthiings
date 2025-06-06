@@ -218,15 +218,21 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
 
     console.log('✅ Total grid items:', items.length, 'Generated items:', images.length);
     console.log('🔧 About to setGridItems. Previous gridItems count:', gridItems.length);
-    setGridItems(items);
-    console.log('✅ setGridItems called with', items.length, 'items');
+    console.log('🔍 Current gridItems generated IDs:', gridItems.filter(item => item.id.startsWith('generated-')).map(item => item.id));
+    console.log('🔍 New items generated IDs:', items.filter(item => item.id.startsWith('generated-')).map(item => item.id));
+    
+    // Force new array reference to ensure state update
+    const newItems = [...items];
+    console.log('🔧 Created new items array reference. Length:', newItems.length);
+    setGridItems(newItems);
+    console.log('✅ setGridItems called with new array reference');
     
     console.log('🏁 GRID ITEMS USEEFFECT COMPLETE');
   }, [images]);
 
   // Debug: Track gridItems state changes
   useEffect(() => {
-    console.log('📊 GRIDITEM STATE CHANGED. New count:', gridItems.length);
+    console.log('🚨 CRITICAL: GRIDITEM STATE ACTUALLY CHANGED! New count:', gridItems.length);
     console.log('📋 GridItems state contains generated items:', gridItems.filter(item => item.id.startsWith('generated-')).map(item => item.id));
   }, [gridItems]);
 
