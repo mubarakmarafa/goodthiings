@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store user data and session
       const userData: User = {
         id: data.user.id,
-        email: data.user.email,
+        username: data.user.username,
         last_used_style: '3d', // Default style
       };
 
@@ -171,17 +171,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, userApiKey: string) => {
+  const signup = async (username: string, password: string, userApiKey: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signup`, {
+      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-username-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password, apiKey: userApiKey }),
       });
 
       const data = await response.json();
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store user data and session
       const userData: User = {
         id: data.user.id,
-        email: data.user.email,
+        username: data.user.username,
         last_used_style: '3d', // Default style
       };
 
