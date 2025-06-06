@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useImageGeneration } from '../hooks/useImageGeneration';
+import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
 import { toast } from 'sonner';
 
 type StyleType = '3d' | 'handdrawn';
@@ -27,6 +27,7 @@ export default function UserInput() {
   const [inputValue, setInputValue] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<StyleType>('3d');
+  const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
   const { generateImage, isGenerating, canGenerate } = useImageGeneration();
 
   const currentStyle = STYLES.find(style => style.id === selectedStyle) || STYLES[1];
@@ -37,6 +38,8 @@ export default function UserInput() {
   };
 
   const toggleDropdown = () => {
+    // Don't allow dropdown when preview is active
+    if (previewImage) return;
     setIsDropdownOpen(!isDropdownOpen);
   };
 
@@ -45,6 +48,33 @@ export default function UserInput() {
     const x = Math.floor(Math.random() * 20) - 10; // -10 to +10
     const y = Math.floor(Math.random() * 20) - 10; // -10 to +10
     return { x, y };
+  };
+
+  const handleSaveImage = () => {
+    if (!previewImage) return;
+    
+    // The image was already generated and is in development mode,
+    // so it should already be in the grid. Just clear the preview.
+    setPreviewImage(null);
+    toast.success('Image saved to grid! 🎨');
+    
+    // Auto-pan to the image in the grid
+    if ((window as any).focusOnNewImage) {
+      (window as any).focusOnNewImage(
+        previewImage.id, 
+        previewImage.grid_position_x, 
+        previewImage.grid_position_y
+      );
+    }
+  };
+
+  const handleDiscardImage = () => {
+    if (!previewImage) return;
+    
+    // TODO: In production, we'd need to remove this from the database
+    // For now in dev mode, we'll just clear the preview
+    setPreviewImage(null);
+    toast.success('Image discarded');
   };
 
   const handleGenerate = async () => {
@@ -71,19 +101,13 @@ export default function UserInput() {
       // Clear the input
       setInputValue('');
       
-      // Success feedback
-      toast.success('Image created! 🎨', { id: 'generating' });
+      // Success feedback and show preview
+      toast.success('Image created! Choose to save or discard.', { id: 'generating' });
       
       console.log('🎉 Image generated successfully:', newImage);
-
-      // Auto-pan to and select the new image (retry logic handles timing)
-      console.log('🎯 UserInput: Will trigger auto-focus for:', newImage.id);
-      if ((window as any).focusOnNewImage) {
-        console.log('🚀 UserInput: Calling focusOnNewImage for:', newImage.id);
-        (window as any).focusOnNewImage(newImage.id, gridPosition.x, gridPosition.y);
-      } else {
-        console.log('❌ UserInput: focusOnNewImage function not available on window');
-      }
+      
+      // Show preview instead of auto-focusing
+      setPreviewImage(newImage);
 
     } catch (error: any) {
       console.error('Failed to generate image:', error);
@@ -95,12 +119,52 @@ export default function UserInput() {
     <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-10">
       <div
         className={`bg-white relative rounded-3xl w-[378px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.15)] border-2 border-[rgba(213,213,213,0.5)] transition-all duration-300 ease-in-out ${
-          isDropdownOpen ? 'h-[140px]' : 'h-[70px]'
+          previewImage 
+            ? 'h-[300px]' // Expanded for preview
+            : isDropdownOpen 
+            ? 'h-[140px]' // Style dropdown
+            : 'h-[70px]'  // Normal input
         }`}
         data-name="User Input"
       >
         <div className="overflow-hidden h-full">
-          {isDropdownOpen ? (
+          {previewImage ? (
+            // Preview state - show generated image with save/discard options
+            <div className="flex flex-col h-full p-4">
+              {/* Generated Image */}
+              <div className="flex-1 flex items-center justify-center mb-4">
+                <div className="w-[180px] h-[180px] rounded-2xl overflow-hidden shadow-lg">
+                  <img 
+                    src={previewImage.image_url} 
+                    alt={previewImage.prompt}
+                    className="w-full h-full object-contain bg-gray-50"
+                  />
+                </div>
+              </div>
+              
+              {/* Prompt Text */}
+              <div className="text-center mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-1">Generated:</p>
+                <p className="text-base font-bold text-black">{previewImage.prompt}</p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDiscardImage}
+                  className="flex-1 h-[45px] bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-semibold text-gray-700"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSaveImage}
+                  className="flex-1 h-[45px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white"
+                >
+                  Save to Grid
+                </button>
+              </div>
+            </div>
+          ) : isDropdownOpen ? (
             // Dropdown state - show style options
             <div className="flex flex-col h-full">
               {STYLES.map((style, index) => (
@@ -154,14 +218,15 @@ export default function UserInput() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isGenerating && inputValue.trim()) {
+                    if (e.key === 'Enter' && !isGenerating && !previewImage && inputValue.trim()) {
                       e.preventDefault();
                       handleGenerate();
                     }
                   }}
+                  disabled={!!previewImage}
                   className={`w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold placeholder-[#c1c1c1] ${
                     inputValue ? 'text-black' : 'text-[#c1c1c1]'
-                  }`}
+                  } ${previewImage ? 'opacity-50' : ''}`}
                 />
               </div>
 
@@ -169,7 +234,7 @@ export default function UserInput() {
               <div className="pr-[5px]">
                 <button 
                   onClick={handleGenerate}
-                  disabled={isGenerating || !inputValue.trim()}
+                  disabled={isGenerating || !inputValue.trim() || !!previewImage}
                   className="w-[60px] h-[60px] bg-[#6AADFF] rounded-[20px] flex items-center justify-center hover:bg-[#5A9AEF] transition-colors outline-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? (
