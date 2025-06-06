@@ -3,7 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-openai-key',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -55,86 +56,84 @@ serve(async (req) => {
       )
     }
 
-    // Generate image with OpenAI latest model (gpt-image-1 or dall-e-3 fallback)
-    const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1', // Latest OpenAI image model
-        prompt: enhancedPrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'high', // Use high quality for better results
-        response_format: 'url'
-      })
-    })
+    // Generate image with OpenAI DALL-E 3
+    console.log('Making OpenAI request with:', {
+      model: 'dall-e-3',
+      prompt: enhancedPrompt.substring(0, 100) + '...',
+      apiKeyPrefix: userApiKey.substring(0, 10) + '...',
+      promptLength: enhancedPrompt.length
+    });
 
-    // Handle potential model fallback
-    if (!openaiResponse.ok) {
-      // If gpt-image-1 fails, try with dall-e-3 as fallback
-      if (openaiResponse.status === 400) {
-        const fallbackResponse = await fetch('https://api.openai.com/v1/images/generations', {
+    // Try DALL-E 3 first, fallback to DALL-E 2 if access issues
+    let openaiResponse;
+    let modelUsed = 'dall-e-3';
+    
+    try {
+      openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userApiKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Supabase-Edge-Function/1.0'
+        },
+        body: JSON.stringify({
+          model: 'dall-e-3',
+          prompt: enhancedPrompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'hd',
+          response_format: 'url'
+        })
+      });
+
+      console.log('DALL-E 3 response status:', openaiResponse.status);
+      
+      // If DALL-E 3 fails with 400/403, try DALL-E 2
+      if (!openaiResponse.ok && (openaiResponse.status === 400 || openaiResponse.status === 403)) {
+        const errorBody = await openaiResponse.text();
+        console.log('DALL-E 3 failed, trying DALL-E 2. Error:', errorBody);
+        
+        // Try DALL-E 2 as fallback
+        openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${userApiKey}`,
             'Content-Type': 'application/json',
+            'User-Agent': 'Supabase-Edge-Function/1.0'
           },
           body: JSON.stringify({
-            model: 'dall-e-3', // Fallback to DALL-E 3
-            prompt: enhancedPrompt,
+            model: 'dall-e-2',
+            prompt: enhancedPrompt.substring(0, 1000), // DALL-E 2 has shorter prompt limit
             n: 1,
             size: '1024x1024',
-            quality: 'hd',
             response_format: 'url'
           })
-        })
+        });
         
-        if (!fallbackResponse.ok) {
-          throw new Error(`OpenAI API error: ${fallbackResponse.statusText}`)
-        }
-        
-        const fallbackData = await fallbackResponse.json()
-        const imageUrl = fallbackData.data[0].url
-        
-        // Continue with fallback result...
-        const { data: imageRecord, error: dbError } = await supabaseClient
-          .from('generated_images')
-          .insert([{
-            user_id: user.id,
-            prompt,
-            enhanced_prompt: enhancedPrompt,
-            style_type,
-            image_url: imageUrl,
-            grid_position_x: grid_position_x || 0,
-            grid_position_y: grid_position_y || 0,
-            generation_status: 'completed'
-          }])
-          .select()
-          .single()
-
-        if (dbError) {
-          throw new Error(`Database error: ${dbError.message}`)
-        }
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            image: imageRecord,
-            message: 'Image generated successfully (using DALL-E 3 fallback)',
-            model_used: 'dall-e-3'
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
+        modelUsed = 'dall-e-2';
+        console.log('DALL-E 2 response status:', openaiResponse.status);
       }
-      
-      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`)
+
+    } catch (fetchError) {
+      console.error('Network error calling OpenAI:', fetchError);
+      throw new Error(`Network error calling OpenAI: ${fetchError.message}`);
     }
+
+    if (!openaiResponse.ok) {
+      const errorBody = await openaiResponse.text();
+      console.error('OpenAI API error details:', errorBody);
+      
+      // Parse error for better user feedback
+      try {
+        const errorJson = JSON.parse(errorBody);
+        const errorMessage = errorJson.error?.message || errorBody;
+        throw new Error(`OpenAI API error (${openaiResponse.status}): ${errorMessage}`);
+      } catch {
+        throw new Error(`OpenAI API error (${openaiResponse.status}): ${errorBody}`);
+      }
+    }
+
+    // Parse successful response
 
     const openaiData = await openaiResponse.json()
     const imageUrl = openaiData.data[0].url
@@ -163,8 +162,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         image: imageRecord,
-        message: 'Image generated successfully',
-        model_used: 'gpt-image-1'
+        message: `Image generated successfully with ${modelUsed.toUpperCase()}`,
+        model_used: modelUsed
       }),
       { 
         status: 200, 

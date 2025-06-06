@@ -22,6 +22,33 @@ export const useImageGeneration = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
 
+  // Test connection to Edge Function
+  const testConnection = async (): Promise<boolean> => {
+    try {
+      console.log('🔍 Testing Edge Function connection...');
+      console.log('🔍 NOTE: This test uses a simple GET request to avoid CORS preflight issues');
+      
+      // Use a simple GET request to test basic connectivity
+      // This avoids the CORS preflight issue with OPTIONS
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/images-generate`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      });
+      
+      console.log('🔍 Connection test result:', response.status);
+      console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      // Even if it returns 405 (Method Not Allowed), it means we can reach the server
+      // The actual issue is CORS configuration for POST requests with custom headers
+      return response.status !== 0 && response.status < 500;
+    } catch (error) {
+      console.error('🔍 Connection test failed:', error);
+      return false;
+    }
+  };
+
   const generateImage = async (
     prompt: string,
     styleType: '3d' | 'handdrawn',
@@ -33,6 +60,17 @@ export const useImageGeneration = () => {
 
     if (!prompt.trim()) {
       throw new Error('Please enter a prompt');
+    }
+
+    // Validate API key format (OpenAI keys start with 'sk-')
+    if (!apiKey.startsWith('sk-')) {
+      throw new Error('Invalid OpenAI API key format. API keys should start with "sk-"');
+    }
+
+    // Test connection first
+    const canConnect = await testConnection();
+    if (!canConnect) {
+      throw new Error('Unable to connect to image generation service. Please check your internet connection or try again later.');
     }
 
     // Create loading image first
@@ -95,6 +133,17 @@ export const useImageGeneration = () => {
 
     try {
       console.log('🎨 Generating image:', { prompt, styleType, gridPosition });
+      console.log('🔑 API Key preview:', apiKey ? `${apiKey.slice(0, 10)}...` : 'NO API KEY');
+      console.log('👤 User ID:', user.id);
+
+      const requestBody = {
+        prompt: prompt.trim(),
+        style_type: styleType,
+        grid_position_x: gridPosition.x,
+        grid_position_y: gridPosition.y,
+      };
+      
+      console.log('📤 Request body:', requestBody);
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-generate`, {
         method: 'POST',
@@ -104,18 +153,28 @@ export const useImageGeneration = () => {
           'apikey': SUPABASE_ANON_KEY,
           'x-openai-key': apiKey,
         },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          style_type: styleType,
-          grid_position_x: gridPosition.x,
-          grid_position_y: gridPosition.y,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Server response:', response.status, errorText);
-        throw new Error(`Server error (${response.status}): ${errorText}`);
+        
+        // Provide more specific error messages based on status code
+        if (response.status === 401) {
+          throw new Error('Authentication failed - please check your OpenAI API key');
+        } else if (response.status === 403) {
+          throw new Error('Access denied - your OpenAI API key may be invalid or have insufficient credits');
+        } else if (response.status === 429) {
+          throw new Error('Rate limit exceeded - please wait a moment and try again');
+        } else if (response.status >= 500) {
+          throw new Error('Server error - please try again later');
+        } else {
+          throw new Error(`Server error (${response.status}): ${errorText}`);
+        }
       }
 
       const data = await response.json();
@@ -128,11 +187,18 @@ export const useImageGeneration = () => {
       return newImage;
     } catch (error) {
       console.error('❌ Image generation failed:', error);
+      console.error('❌ Error type:', error instanceof TypeError ? 'TypeError' : typeof error);
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      
       // Remove loading image on error
       setImages(prev => prev.filter(img => img.id !== loadingImage.id));
+      
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Network error - please check your internet connection');
+        throw new Error('CORS Error: Image generation blocked by browser security policy. The Supabase Edge Function needs CORS configuration to allow requests from localhost.');
+      } else if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        throw new Error('CORS Error: Browser blocked the request due to missing CORS headers on the server.');
       }
+      
       throw error;
     } finally {
       setIsGenerating(false);
@@ -175,6 +241,7 @@ export const useImageGeneration = () => {
   return {
     generateImage,
     loadUserImages,
+    testConnection,
     isGenerating,
     images,
     canGenerate: !!(user && apiKey),

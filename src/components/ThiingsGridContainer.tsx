@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import ThiingsGrid, { type ItemConfig } from "../../lib/ThiingsGrid";
 
 // Configuration - Easy to customize
@@ -636,6 +637,51 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
   );
 };
 
+// Debug Panel Component
+const DebugPanel = () => {
+  const { testConnection, canGenerate } = useImageGeneration();
+  const { user, apiKey } = useAuth();
+
+  const handleTestConnection = async () => {
+    toast.loading('Testing connection...', { id: 'test-connection' });
+    try {
+      const canConnect = await testConnection();
+      if (canConnect) {
+        toast.success('✅ Server reachable! CORS issue confirmed.', { id: 'test-connection', duration: 5000 });
+      } else {
+        toast.error('❌ Server unreachable', { id: 'test-connection' });
+      }
+    } catch (error) {
+      console.error('Connection test error:', error);
+      toast.error('❌ Connection test failed', { id: 'test-connection' });
+    }
+  };
+
+  // Only show debug panel if user is logged in
+  if (!canGenerate) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 bg-white p-4 rounded-lg shadow-lg border max-w-sm">
+      <h3 className="text-sm font-semibold mb-2 text-gray-700">🔧 Debug Panel</h3>
+      <div className="space-y-2 text-xs">
+        <div>User: {user?.email || 'None'}</div>
+        <div>API Key: {apiKey ? `${apiKey.slice(0, 10)}...` : 'None'}</div>
+        <div>Can Generate: {canGenerate ? '✅' : '❌'}</div>
+        <button
+          onClick={handleTestConnection}
+          className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+        >
+          🔍 Test Connection
+        </button>
+        <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
+          <div className="font-semibold text-orange-800 mb-1">⚠️ Known Issue:</div>
+          <div className="text-orange-700">CORS policy blocks image generation. Edge Function needs CORS headers.</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Wrapper component that only renders the logic when user exists
 export const ThiingsGridContainer = () => {
   const { user } = useAuth();
@@ -664,7 +710,12 @@ export const ThiingsGridContainer = () => {
     return null;
   }
 
-  return <ThiingsGridContainerLogic images={images} loadUserImages={loadUserImages} />;
+  return (
+    <>
+      <ThiingsGridContainerLogic images={images} loadUserImages={loadUserImages} />
+      <DebugPanel />
+    </>
+  );
 };
 
 export default ThiingsGridContainer; 

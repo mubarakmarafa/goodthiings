@@ -31,49 +31,87 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
     try {
       console.log('Starting authentication with:', { email, hasPassword: !!password, hasApiKey: !!apiKey });
       
-      // Try login first
+      // More robust approach: Check which HTTP status code we get
+      let loginSuccessful = false;
+      let shouldTrySignup = false;
+      
       try {
         await onLogin(email, password, apiKey);
+        loginSuccessful = true;
         toast.success('Welcome back!');
       } catch (loginError: any) {
-        console.log('Login failed, trying signup. Error was:', loginError.message);
+        console.log('Login failed with error:', loginError.message);
         
-        // If login fails due to user not found, try signup
-        if (loginError.message?.includes('Invalid login credentials') || 
-            loginError.message?.includes('User not found')) {
+        // More robust error detection for different environments
+        const errorMsg = loginError.message?.toLowerCase() || '';
+        
+        // Check for various forms of "user not found" or "invalid credentials"
+        if (errorMsg.includes('invalid login credentials') || 
+            errorMsg.includes('user not found') ||
+            errorMsg.includes('invalid email or password') ||
+            errorMsg.includes('email not found') ||
+            errorMsg.includes('no user found') ||
+            errorMsg.includes('authentication failed') ||
+            errorMsg.includes('401') ||
+            loginError.status === 401) {
           
-          toast.info('Creating your account...');
-          try {
-            await onSignUp(email, password, apiKey);
-            toast.success('Account created successfully! Welcome to GoodThiings!');
-          } catch (signupError: any) {
-            console.log('Signup also failed:', signupError.message);
-            
-            // Better error messages for common Supabase issues
-            if (signupError.message?.includes('Email address') && signupError.message?.includes('invalid')) {
-              toast.error('Please use a valid email address (try Gmail, Yahoo, or your work email)');
-            } else if (signupError.message?.includes('weak') || signupError.message?.includes('password')) {
-              toast.error('Password must be at least 6 characters long');
-            } else {
-              toast.error(`Account creation failed: ${signupError.message}`);
-            }
-            throw signupError;
-          }
-        } else if (loginError.message?.includes('Email not confirmed')) {
-          // Handle email confirmation case
+          shouldTrySignup = true;
+          
+        } else if (errorMsg.includes('email not confirmed') || 
+                   errorMsg.includes('confirm your email') ||
+                   errorMsg.includes('verify your email')) {
           toast.error('Please check your email and click the confirmation link, then try again.');
           throw loginError;
+        } else if (errorMsg.includes('too many') || errorMsg.includes('rate limit')) {
+          toast.error('Too many attempts. Please wait a moment and try again.');
+          throw loginError;
         } else {
-          // Other login errors (wrong password, etc.)
+          // For other errors (like wrong password), don't try signup
+          toast.error(`Login failed: ${loginError.message}`);
           throw loginError;
         }
       }
+      
+      // If login failed due to user not existing, try signup
+      if (!loginSuccessful && shouldTrySignup) {
+        toast.info('Creating your account...');
+        try {
+          await onSignUp(email, password, apiKey);
+          toast.success('Account created successfully! Welcome to GoodThiings!');
+        } catch (signupError: any) {
+          console.log('Signup also failed:', signupError.message);
+          
+          const signupErrorMsg = signupError.message?.toLowerCase() || '';
+          
+          // Handle signup-specific errors
+          if (signupErrorMsg.includes('user already registered') || 
+              signupErrorMsg.includes('email already exists') ||
+              signupErrorMsg.includes('already have an account')) {
+            toast.error('An account with this email already exists. Please try logging in instead, or use a different email.');
+          } else if (signupErrorMsg.includes('email') && signupErrorMsg.includes('invalid')) {
+            toast.error('Please use a valid email address (try Gmail, Yahoo, or your work email)');
+          } else if (signupErrorMsg.includes('weak') || signupErrorMsg.includes('password')) {
+            toast.error('Password must be at least 6 characters long');
+          } else if (signupErrorMsg.includes('email rate limit') || signupErrorMsg.includes('too many')) {
+            toast.error('Too many signup attempts. Please wait a moment and try again.');
+          } else {
+            toast.error(`Account creation failed: ${signupError.message}`);
+          }
+          throw signupError;
+        }
+      }
+      
     } catch (error: any) {
       console.error('Auth error:', error);
-      // Don't show duplicate error messages if we already showed a specific one
-      if (!error.message?.includes('Email address') && 
-          !error.message?.includes('Password must be') && 
-          !error.message?.includes('Account creation failed')) {
+      // Only show generic error if we haven't already shown a specific one
+      const errorMsg = error.message?.toLowerCase() || '';
+      if (!errorMsg.includes('login failed:') && 
+          !errorMsg.includes('account creation failed:') && 
+          !errorMsg.includes('please check your email') &&
+          !errorMsg.includes('please use a valid email') &&
+          !errorMsg.includes('password must be') &&
+          !errorMsg.includes('too many') &&
+          !errorMsg.includes('already exists')) {
         toast.error(error.message || 'Authentication failed');
       }
     } finally {
