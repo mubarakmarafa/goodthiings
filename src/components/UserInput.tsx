@@ -130,16 +130,16 @@ export default function UserInput() {
         <div className="overflow-hidden h-full">
           {previewImage ? (
                         // Preview state - show generated image with save/discard options (Figma design)
-            <div className="flex flex-col h-full p-1">
+            <div className="flex flex-col h-full">
               {/* Blue Header Banner with 5px margin */}
-              <div className="bg-[#6AADFF] rounded-2xl px-6 py-4 text-center mb-1">
+              <div className="bg-[#6AADFF] rounded-2xl px-6 py-4 text-center m-1 mb-0">
                 <p className="text-white text-[16px] font-semibold">
                   Here's your {previewImage.prompt}
                 </p>
               </div>
               
               {/* White Content Area */}
-              <div className="bg-white px-8 pt-6 flex flex-col flex-1">
+              <div className="bg-white px-8 pt-6 pb-1 flex flex-col flex-1 rounded-b-3xl">
                 {/* Generated Image - Large and Prominent */}
                 <div className="flex-1 flex items-center justify-center mb-6">
                   <div className="flex items-center justify-center" style={{ maxWidth: '180px', maxHeight: '180px' }}>
@@ -151,8 +151,8 @@ export default function UserInput() {
                   </div>
                 </div>
                 
-                {/* Action Buttons with 5px margin all around */}
-                <div className="flex gap-3 pb-1">
+                {/* Action Buttons - extend to edges */}
+                <div className="flex gap-3">
                   <button
                     onClick={handleDiscardImage}
                     className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px]"
