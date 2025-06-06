@@ -46,24 +46,93 @@ serve(async (req) => {
       ? `3D rendered, high quality, modern digital art style: ${prompt}`
       : `Hand-drawn illustration, sketch style, artistic: ${prompt}`
 
-    // Generate image with OpenAI DALL-E 3
+    // Get user's OpenAI API key from request headers
+    const userApiKey = req.headers.get('x-openai-key')
+    if (!userApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key is required. Please provide your API key.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Generate image with OpenAI latest model (gpt-image-1 or dall-e-3 fallback)
     const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${userApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-1', // Latest OpenAI image model
         prompt: enhancedPrompt,
         n: 1,
         size: '1024x1024',
-        quality: 'standard',
+        quality: 'high', // Use high quality for better results
         response_format: 'url'
       })
     })
 
+    // Handle potential model fallback
     if (!openaiResponse.ok) {
+      // If gpt-image-1 fails, try with dall-e-3 as fallback
+      if (openaiResponse.status === 400) {
+        const fallbackResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${userApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3', // Fallback to DALL-E 3
+            prompt: enhancedPrompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'hd',
+            response_format: 'url'
+          })
+        })
+        
+        if (!fallbackResponse.ok) {
+          throw new Error(`OpenAI API error: ${fallbackResponse.statusText}`)
+        }
+        
+        const fallbackData = await fallbackResponse.json()
+        const imageUrl = fallbackData.data[0].url
+        
+        // Continue with fallback result...
+        const { data: imageRecord, error: dbError } = await supabaseClient
+          .from('generated_images')
+          .insert([{
+            user_id: user.id,
+            prompt,
+            enhanced_prompt: enhancedPrompt,
+            style_type,
+            image_url: imageUrl,
+            grid_position_x: grid_position_x || 0,
+            grid_position_y: grid_position_y || 0,
+            generation_status: 'completed'
+          }])
+          .select()
+          .single()
+
+        if (dbError) {
+          throw new Error(`Database error: ${dbError.message}`)
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            image: imageRecord,
+            message: 'Image generated successfully (using DALL-E 3 fallback)',
+            model_used: 'dall-e-3'
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+      
       throw new Error(`OpenAI API error: ${openaiResponse.statusText}`)
     }
 
@@ -94,7 +163,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         image: imageRecord,
-        message: 'Image generated successfully' 
+        message: 'Image generated successfully',
+        model_used: 'gpt-image-1'
       }),
       { 
         status: 200, 
