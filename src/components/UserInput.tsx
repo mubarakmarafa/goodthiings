@@ -195,6 +195,12 @@ export default function UserInput() {
                   placeholder="An apple"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isGenerating && inputValue.trim()) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
                   className={`w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold placeholder-[#c1c1c1] ${
                     inputValue ? 'text-black' : 'text-[#c1c1c1]'
                   }`}

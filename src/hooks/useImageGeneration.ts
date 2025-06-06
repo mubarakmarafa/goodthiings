@@ -35,6 +35,33 @@ export const useImageGeneration = () => {
       throw new Error('Please enter a prompt');
     }
 
+    // Check if using development bypass
+    const isDevMode = user.id === 'dev-user-123';
+    if (isDevMode) {
+      console.log('🚧 Development mode - simulating image generation...');
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Create fake generated image for development
+      const fakeImage: GeneratedImage = {
+        id: `dev-${Date.now()}`,
+        user_id: user.id,
+        prompt: prompt.trim(),
+        enhanced_prompt: `${styleType === '3d' ? '3D rendered, high quality, modern digital art style: ' : 'Hand-drawn illustration, sketch style, artistic: '}${prompt.trim()}`,
+        style_type: styleType,
+        image_url: `/thiings/${Math.floor(Math.random() * 9) + 1}.png`, // Random sample image
+        grid_position_x: gridPosition.x,
+        grid_position_y: gridPosition.y,
+        generation_status: 'completed',
+        created_at: new Date().toISOString(),
+      };
+      
+      setImages(prev => [fakeImage, ...prev]);
+      console.log('✅ Development image generated:', fakeImage);
+      return fakeImage;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -56,12 +83,13 @@ export const useImageGeneration = () => {
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate image');
+        const errorText = await response.text();
+        console.error('❌ Server response:', response.status, errorText);
+        throw new Error(`Server error (${response.status}): ${errorText}`);
       }
 
+      const data = await response.json();
       console.log('✅ Image generated successfully:', data);
 
       const newImage = data.image as GeneratedImage;
@@ -70,6 +98,9 @@ export const useImageGeneration = () => {
       return newImage;
     } catch (error) {
       console.error('❌ Image generation failed:', error);
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error - please check your internet connection');
+      }
       throw error;
     } finally {
       setIsGenerating(false);
