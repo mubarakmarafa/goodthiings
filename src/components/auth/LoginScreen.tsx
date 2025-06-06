@@ -171,7 +171,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
         console.log('🆕 Login suggests user doesn\'t exist - attempting SIGNUP...');
         toast.info('Creating your account...');
         try {
-          await onSignUp(email, password, apiKey);
+          await onSignUp(username, password, apiKey);
           console.log('✅ SIGNUP successful!');
           toast.success('Account created successfully! Welcome to GoodThiings!');
         } catch (signupError: any) {
@@ -299,15 +299,15 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
           {/* Form Fields */}
           <div className="flex-1 w-full px-2 py-4">
             <div className="flex flex-col gap-2 w-full">
-              {/* Email Input */}
+              {/* Username Input */}
               <div className="bg-[#f3f3f3] rounded-2xl w-full">
                 <input
-                  type="email"
-                  placeholder="my@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  placeholder="john123"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold text-[#333] placeholder-[#c1c1c1] px-4 py-3"
-                  autoComplete="email"
+                  autoComplete="username"
                   required
                   disabled={isLoading}
                 />
@@ -407,7 +407,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  disabled={isLoading || !email}
+                  disabled={isLoading || !username}
                   className="text-sm text-[#6AADFF] hover:text-[#5A9AEF] underline disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Forgot Password?
@@ -418,7 +418,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                   <button
                     type="button"
                     onClick={handleTestDirectAuth}
-                    disabled={isLoading || !email || !password}
+                    disabled={isLoading || !username || !password}
                     className="text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     🧪 Test Direct Auth
@@ -426,7 +426,7 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                   <button
                     type="button"
                     onClick={handleCheckUserStatus}
-                    disabled={isLoading || !email}
+                    disabled={isLoading || !username}
                     className="text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     🔍 Check User Status

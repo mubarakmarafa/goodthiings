@@ -664,7 +664,7 @@ const DebugPanel = () => {
     <div className="fixed top-4 right-4 z-50 bg-white p-4 rounded-lg shadow-lg border max-w-sm">
       <h3 className="text-sm font-semibold mb-2 text-gray-700">🔧 Debug Panel</h3>
       <div className="space-y-2 text-xs">
-        <div>User: {user?.email || 'None'}</div>
+        <div>User: {user?.username || 'None'}</div>
         <div>API Key: {apiKey ? `${apiKey.slice(0, 10)}...` : 'None'}</div>
         <div>Can Generate: {canGenerate ? '✅' : '❌'}</div>
         <button

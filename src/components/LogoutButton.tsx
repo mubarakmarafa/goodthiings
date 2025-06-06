@@ -44,10 +44,10 @@ export default function LogoutButton() {
             </button>
           </div>
 
-          {/* User Email (small) */}
+          {/* Username (small) */}
           <div className="pr-4">
             <div className="text-[12px] font-['Helvetica_Neue'] text-gray-500 max-w-[120px] truncate">
-              {user.email}
+              {user.username}
             </div>
           </div>
         </div>

@@ -98,19 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     
-    console.log('❌ Development bypass NOT activated. Email:', email, 'Password length:', password.length);
+    console.log('❌ Development bypass NOT activated. Username:', username, 'Password length:', password.length);
     
     try {
       console.log('🌐 Making request to auth-signin:', `${EDGE_FUNCTIONS_URL}/auth-signin`);
       
-      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-signin`, {
+      const response = await fetch(`${EDGE_FUNCTIONS_URL}/auth-username-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
 
       console.log('📡 Response received:', {
