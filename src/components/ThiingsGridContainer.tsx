@@ -246,7 +246,15 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       item,
     }));
     console.log('✅ ItemConfigs created. Count:', configs.length);
-    console.log('📋 Generated items in configs:', configs.filter(c => c.item.id.startsWith('generated-')).map(c => c.item.id));
+    
+    const generatedConfigs = configs.filter(c => c.item.id.startsWith('generated-'));
+    console.log('📋 Generated items in configs:', generatedConfigs.map(c => c.item.id));
+    console.log('🔍 Generated config details:', generatedConfigs.map(c => ({ 
+      id: c.item.id, 
+      type: c.item.type, 
+      pos: `${c.item.gridX},${c.item.gridY}`,
+      index: c.gridIndex 
+    })));
     return configs;
   }, [gridItems]);
 
@@ -342,10 +350,12 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       setTimeout(() => {
         focusOnNewImage(imageId, gridX, gridY, retryCount + 1);
       }, 100);
-    } else {
-      // Give up after 1 second
-      console.log('❌ Could not find image after 10 attempts. Available IDs:', itemConfigs.slice(0, 5).map(c => c.item.id));
-    }
+          } else {
+        // Give up after 1 second
+        console.log('❌ Could not find image after 10 attempts. Available IDs:', itemConfigs.slice(0, 5).map(c => c.item.id));
+        console.log('❌ DEBUGGING: itemConfigs length at failure:', itemConfigs.length);
+        console.log('❌ DEBUGGING: Total generated configs at failure:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).length);
+      }
   }, [itemConfigs, focusOnImage, forceUpdate]);
 
   // Auto-select and pan to newest completed image
@@ -356,12 +366,16 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       
       if (newestImage.generation_status === 'completed' && newestImage.id.startsWith('dev-')) {
         console.log('✅ Found completed dev image, will auto-focus with retry logic');
+        console.log('🔍 Current itemConfigs length when auto-focus triggers:', itemConfigs.length);
+        console.log('🔍 Generated configs when auto-focus triggers:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).length);
         
-        // Start trying immediately - retry logic will handle timing
-        focusOnNewImage(newestImage.id, newestImage.grid_position_x, newestImage.grid_position_y);
+        // Give React a moment to process state changes before starting retry logic
+        setTimeout(() => {
+          focusOnNewImage(newestImage.id, newestImage.grid_position_x, newestImage.grid_position_y);
+        }, 50);
       }
     }
-  }, [images, focusOnNewImage]);
+  }, [images, focusOnNewImage, itemConfigs]);
 
   // Make functions available globally
   useEffect(() => {
