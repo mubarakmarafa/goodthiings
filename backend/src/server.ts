@@ -13,7 +13,9 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // Your React dev server
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://goodthiings.vercel.app', 'https://*.vercel.app']
+    : ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 app.use(express.json());

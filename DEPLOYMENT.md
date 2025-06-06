@@ -1,6 +1,38 @@
-# GitHub Pages Deployment Guide
+# Deployment Guide
 
-This project is configured to automatically deploy to GitHub Pages when you push to the `main` branch.
+This project has both frontend and backend components:
+- **Frontend**: Deployed to Vercel (https://goodthiings.vercel.app)
+- **Backend**: Ready for Railway deployment
+
+## Backend Deployment (Railway) 🚀
+
+### Prerequisites
+- Railway account: https://railway.app
+- GitHub repository connected
+- Supabase environment variables
+
+### Environment Variables Required:
+```
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  
+SUPABASE_ANON_KEY=your_anon_key
+NODE_ENV=production
+```
+
+### Railway Deployment Steps:
+1. **Connect Repository**: Link your GitHub repo to Railway
+2. **Set Environment Variables**: Add the Supabase credentials
+3. **Deploy**: Railway will automatically use `npm run backend:start`
+4. **Domain**: Railway provides a custom domain like `https://your-app.railway.app`
+
+### Configuration Files:
+- ✅ `Procfile` - Railway deployment configuration  
+- ✅ `package.json` - Updated with deployment scripts
+- ✅ `backend/src/server.ts` - Production CORS settings
+
+## Frontend Deployment (Vercel) ✅
+
+The frontend is already deployed to Vercel and configured to work with the backend.
 
 ## Setup Instructions
 
