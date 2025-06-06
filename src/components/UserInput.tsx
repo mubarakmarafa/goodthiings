@@ -120,7 +120,7 @@ export default function UserInput() {
       <div
         className={`bg-white relative rounded-3xl w-[378px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.15)] border-2 border-[rgba(213,213,213,0.5)] transition-all duration-300 ease-in-out ${
           previewImage 
-            ? 'h-[300px]' // Expanded for preview
+            ? 'h-[340px]' // Expanded for preview with header
             : isDropdownOpen 
             ? 'h-[140px]' // Style dropdown
             : 'h-[70px]'  // Normal input
@@ -129,39 +129,43 @@ export default function UserInput() {
       >
         <div className="overflow-hidden h-full">
           {previewImage ? (
-            // Preview state - show generated image with save/discard options
-            <div className="flex flex-col h-full p-4">
-              {/* Generated Image */}
-              <div className="flex-1 flex items-center justify-center mb-4">
-                <div className="w-[180px] h-[180px] rounded-2xl overflow-hidden shadow-lg">
-                  <img 
-                    src={previewImage.image_url} 
-                    alt={previewImage.prompt}
-                    className="w-full h-full object-contain bg-gray-50"
-                  />
+            // Preview state - show generated image with save/discard options (Figma design)
+            <div className="flex flex-col h-full">
+              {/* Blue Header Banner */}
+              <div className="bg-[#6AADFF] rounded-t-3xl px-4 py-3 text-center">
+                <p className="text-white text-[16px] font-semibold">
+                  Here's your {previewImage.prompt}
+                </p>
+              </div>
+              
+                             {/* White Content Area */}
+               <div className="flex-1 bg-white px-6 py-6 flex flex-col rounded-b-3xl">
+                {/* Generated Image - Large and Prominent */}
+                <div className="flex-1 flex items-center justify-center mb-6">
+                  <div className="w-[200px] h-[200px] flex items-center justify-center">
+                    <img 
+                      src={previewImage.image_url} 
+                      alt={previewImage.prompt}
+                      className="max-w-full max-h-full object-contain drop-shadow-lg"
+                    />
+                  </div>
                 </div>
-              </div>
-              
-              {/* Prompt Text */}
-              <div className="text-center mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-1">Generated:</p>
-                <p className="text-base font-bold text-black">{previewImage.prompt}</p>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={handleDiscardImage}
-                  className="flex-1 h-[45px] bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-semibold text-gray-700"
-                >
-                  Discard
-                </button>
-                <button
-                  onClick={handleSaveImage}
-                  className="flex-1 h-[45px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white"
-                >
-                  Save to Grid
-                </button>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleDiscardImage}
+                    className="flex-1 h-[48px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[16px]"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    onClick={handleSaveImage}
+                    className="flex-1 h-[48px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[16px]"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           ) : isDropdownOpen ? (
