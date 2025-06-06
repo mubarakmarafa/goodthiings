@@ -59,6 +59,32 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
     }
   };
 
+  const handleCheckUserStatus = async () => {
+    if (!email) {
+      toast.error('Please enter your email address first');
+      return;
+    }
+
+    console.log('🔍 Checking user status...');
+    try {
+      setIsLoading(true);
+      
+      // Call the global test function we added to window
+      const result = await (window as any).checkUserStatus(email);
+      
+      if (result.exists) {
+        toast.success('✅ User exists and password reset sent! Check console for details.');
+      } else {
+        toast.error('❌ User status check failed. Check console for details.');
+      }
+    } catch (error: any) {
+      console.error('User status check error:', error);
+      toast.error('Status check failed: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -387,15 +413,25 @@ export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: Logi
                   Forgot Password?
                 </button>
                 
-                {/* Debug Test Button */}
-                <button
-                  type="button"
-                  onClick={handleTestDirectAuth}
-                  disabled={isLoading || !email || !password}
-                  className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  🧪 Test Direct Auth (Debug)
-                </button>
+                {/* Debug Test Buttons */}
+                <div className="flex gap-3 text-xs">
+                  <button
+                    type="button"
+                    onClick={handleTestDirectAuth}
+                    disabled={isLoading || !email || !password}
+                    className="text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    🧪 Test Direct Auth
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCheckUserStatus}
+                    disabled={isLoading || !email}
+                    className="text-gray-500 hover:text-gray-700 underline disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    🔍 Check User Status
+                  </button>
+                </div>
               </div>
             </div>
           </div>

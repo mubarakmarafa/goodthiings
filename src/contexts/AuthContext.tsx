@@ -286,9 +286,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // TEST: Check if user exists and email confirmation status
+  const checkUserStatus = async (email: string) => {
+    console.log('🔍 Checking user status for:', email);
+    
+    try {
+      // Try to trigger a password reset to see if user exists and get status
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      
+      console.log('🔍 User status check response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (response.ok) {
+        console.log('✅ User exists - password reset email sent (if confirmed)');
+        return { exists: true, canReset: true, response: data };
+      } else {
+        console.log('❌ User status check failed:', data);
+        return { exists: false, canReset: false, error: data };
+      }
+    } catch (error) {
+      console.error('🔍 User status check error:', error);
+      return { exists: false, canReset: false, error: error };
+    }
+  };
+
   // Add this to window for manual testing
   if (typeof window !== 'undefined') {
     (window as any).testDirectAuth = testDirectAuth;
+    (window as any).checkUserStatus = checkUserStatus;
   }
 
   const logout = () => {
