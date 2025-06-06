@@ -7,7 +7,7 @@ import LogoutButton from "./components/LogoutButton";
 import { Toaster } from 'sonner';
 
 function AppContent() {
-  const { user, isLoading, login, signup } = useAuth();
+  const { user, isLoading, login, signup, resetPassword } = useAuth();
 
   if (isLoading) {
     return (
@@ -22,6 +22,7 @@ function AppContent() {
       <LoginScreen 
         onLogin={login}
         onSignUp={signup}
+        onResetPassword={resetPassword}
       />
     );
   }

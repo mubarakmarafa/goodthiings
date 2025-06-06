@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string, apiKey: string) => Promise<void>;
   signup: (email: string, password: string, apiKey: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => void;
   updateApiKey: (apiKey: string) => void;
 }
@@ -138,7 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         
         // Use the more specific error message if available
-        const errorMessage = data.originalError || data.error || 'Login failed';
+        let errorMessage = data.originalError || data.error || 'Login failed';
+        
+        // Special handling for common Supabase auth issues
+        if (errorMessage.includes('Invalid login credentials')) {
+          errorMessage = 'Login failed. This could be due to: wrong password, unconfirmed email, or account issues. Please check your email for a confirmation link or try resetting your password.';
+        }
+        
         throw new Error(errorMessage);
       }
 
@@ -208,6 +215,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    console.log('🔑 Requesting password reset for:', email);
+    
+    // For now, we'll use a simple approach with Supabase client
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ 
+          email,
+          options: {
+            redirectTo: window.location.origin
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Password reset failed');
+      }
+
+      console.log('✅ Password reset email sent successfully');
+    } catch (error) {
+      console.error('Password reset error:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setApiKey(null);
@@ -226,6 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     signup,
+    resetPassword,
     logout,
     updateApiKey,
   };

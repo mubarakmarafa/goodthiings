@@ -4,15 +4,34 @@ import { toast } from 'sonner';
 interface LoginScreenProps {
   onLogin: (email: string, password: string, apiKey: string) => Promise<void>;
   onSignUp: (email: string, password: string, apiKey: string) => Promise<void>;
+  onResetPassword: (email: string) => Promise<void>;
 }
 
-export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onSignUp, onResetPassword }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [forceLoginOnly, setForceLoginOnly] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Please enter your email address first');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await onResetPassword(email);
+      toast.success('Password reset email sent! Check your inbox and follow the instructions.');
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      toast.error(error.message || 'Failed to send password reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,12 +100,18 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
           console.log('⏳ Rate limit hit');
           toast.error('Too many attempts. Please wait a moment and try again.');
           throw loginError;
-        } else {
-          // For other errors (like wrong password), don't try signup
-          console.log('🚫 Other login error - NOT trying signup:', loginError.message);
-          toast.error(`Login failed: ${loginError.message}`);
-          throw loginError;
-        }
+                  } else {
+            // For other errors (like wrong password), don't try signup
+            console.log('🚫 Other login error - NOT trying signup:', loginError.message);
+            
+            // Special handling for "Invalid login credentials"
+            if (errorMsg.includes('invalid login credentials')) {
+              toast.error('Login failed. This could be: wrong password, unconfirmed email, or account locked. Try checking your email for confirmation or contact support.');
+            } else {
+              toast.error(`Login failed: ${loginError.message}`);
+            }
+            throw loginError;
+          }
       }
       
       // If login failed due to user not existing, try signup (unless force login only)
@@ -323,6 +348,18 @@ export default function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
                 >
                   I have an existing account (login only)
                 </label>
+              </div>
+              
+              {/* Forgot Password Link */}
+              <div className="flex justify-center px-2 mt-2">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading || !email}
+                  className="text-sm text-[#6AADFF] hover:text-[#5A9AEF] underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Forgot Password?
+                </button>
               </div>
             </div>
           </div>
