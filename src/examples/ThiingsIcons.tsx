@@ -20,6 +20,7 @@ let selectedImageState = {
   isSelected: false,
   isAnimating: false // Track if centering animation is in progress
 };
+let imageInteractionInProgress = false; // Flag to prevent grid deselection during image touch
 
 // Helper function to calculate distance-based scale
 const calculateScale = (gridX: number, gridY: number, centerX: number, centerY: number) => {
@@ -39,10 +40,10 @@ const ThiingsIconCell = ({ gridIndex, position, isMoving }: ItemConfig) => {
   // Check if this image is selected
   const isSelected = selectedImageState.isSelected && selectedImageState.gridIndex === gridIndex;
   
-  // Handle click events - Select this image and focus on it
-  const handleClick = (e: React.MouseEvent) => {
+  // Handle click/touch events - Select this image and focus on it
+  const handleImageInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation(); // Prevent grid panning when clicking on an image
-    console.log(`Icon clicked: ${gridIndex} at position (${position.x}, ${position.y})`);
+    console.log(`Icon interacted: ${gridIndex} at position (${position.x}, ${position.y})`);
     
     // If this image is already selected, don't do anything
     if (selectedImageState.isSelected && selectedImageState.gridIndex === gridIndex) {
@@ -63,6 +64,17 @@ const ThiingsIconCell = ({ gridIndex, position, isMoving }: ItemConfig) => {
     }
   };
 
+  // Handle touch start specifically to prevent grid deselection
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent grid touch handler from firing
+    imageInteractionInProgress = true; // Mark that an image interaction is starting
+    
+    // Clear the flag after a short delay to allow the interaction to complete
+    setTimeout(() => {
+      imageInteractionInProgress = false;
+    }, 100);
+  };
+
   // Calculate scale based on distance from current center
   const baseScale = calculateScale(position.x, position.y, currentCenterPosition.x, currentCenterPosition.y);
   
@@ -77,7 +89,9 @@ const ThiingsIconCell = ({ gridIndex, position, isMoving }: ItemConfig) => {
   return (
     <div 
       className={`absolute inset-1 flex items-center justify-center cursor-pointer transition-all duration-300`}
-      onClick={handleClick}
+      onClick={handleImageInteraction}
+      onTouchStart={handleTouchStart}
+      data-image-cell="true"
       style={{
         transform: `scale(${finalScale})`,
         transformOrigin: 'center',
@@ -279,8 +293,8 @@ export const ThiingsIcons = () => {
           }
         }}
         onTouchStart={() => {
-          // Deselect when starting to touch drag the grid
-          if (selectedImageState.isSelected) {
+          // Only deselect if not currently interacting with an image
+          if (selectedImageState.isSelected && !imageInteractionInProgress) {
             console.log("Grid touch interaction detected - deselecting image");
             selectedImageState = {
               gridIndex: null,
