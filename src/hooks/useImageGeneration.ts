@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SUPABASE_URL = 'https://whstudldcjncgyybfezn.supabase.co';
@@ -181,6 +181,12 @@ export const useImageGeneration = () => {
       // Replace loading image with completed image
       setImages(prev => prev.map(img => img.id === loadingImage.id ? newImage : img));
 
+      // Also reload all images from database to ensure we have the latest data
+      console.log('🔄 Reloading all user images after successful generation...');
+      setTimeout(() => {
+        loadUserImages();
+      }, 1000); // Small delay to ensure database is fully updated
+
       return newImage;
     } catch (error) {
       console.error('❌ Image generation failed:', error);
@@ -203,7 +209,10 @@ export const useImageGeneration = () => {
   };
 
   const loadUserImages = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('🚫 loadUserImages: No user found, skipping');
+      return;
+    }
 
     // Check if using development bypass
     const isDevMode = user.id === 'dev-user-123';
@@ -214,7 +223,8 @@ export const useImageGeneration = () => {
     }
 
     try {
-      console.log('📚 Loading user images...');
+      console.log('📚 Loading user images for user:', user.id, user.username);
+      console.log('📚 Making request to:', `${SUPABASE_URL}/functions/v1/images-list`);
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-list`, {
         method: 'GET',
@@ -225,16 +235,35 @@ export const useImageGeneration = () => {
         },
       });
 
+      console.log('📚 Response status:', response.status);
+      console.log('📚 Response headers:', Object.fromEntries(response.headers.entries()));
+
       const data = await response.json();
+      console.log('📚 Response data:', data);
 
       if (response.ok) {
+        console.log('✅ Setting images state with:', data.images?.length || 0, 'images');
+        console.log('📋 Images data:', data.images);
         setImages(data.images || []);
-        console.log('✅ Loaded', data.images?.length || 0, 'images');
+        console.log('✅ Images state updated successfully');
+      } else {
+        console.error('❌ Failed to load images - bad response:', response.status, data);
       }
     } catch (error) {
-      console.error('❌ Failed to load images:', error);
+      console.error('❌ Failed to load images - exception:', error);
     }
   }, [user]);
+
+  // Expose loadUserImages globally for debugging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).loadUserImages = loadUserImages;
+      (window as any).debugImages = () => {
+        console.log('🔍 Current images state:', images);
+        console.log('🔍 User info:', { id: user?.id, username: user?.username });
+      };
+    }
+  }, [loadUserImages, images, user]);
 
   return {
     generateImage,
