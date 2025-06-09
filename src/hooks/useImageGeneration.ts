@@ -22,27 +22,25 @@ export const useImageGeneration = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
 
-  // Test connection to Edge Function
+  // Test connection to Edge Function with proper OPTIONS request
   const testConnection = async (): Promise<boolean> => {
     try {
       console.log('🔍 Testing Edge Function connection...');
-      console.log('🔍 NOTE: This test uses a simple GET request to avoid CORS preflight issues');
       
-      // Use a simple GET request to test basic connectivity
-      // This avoids the CORS preflight issue with OPTIONS
+      // Use OPTIONS request to test CORS and connectivity
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-generate`, {
-        method: 'GET',
+        method: 'OPTIONS',
         headers: {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
         },
       });
       
       console.log('🔍 Connection test result:', response.status);
       console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
       
-      // Even if it returns 405 (Method Not Allowed), it means we can reach the server
-      // The actual issue is CORS configuration for POST requests with custom headers
-      return response.status !== 0 && response.status < 500;
+      // OPTIONS should return 200 if CORS is properly configured
+      return response.status === 200;
     } catch (error) {
       console.error('🔍 Connection test failed:', error);
       return false;
@@ -67,11 +65,8 @@ export const useImageGeneration = () => {
       throw new Error('Invalid OpenAI API key format. API keys should start with "sk-"');
     }
 
-    // Test connection first
-    const canConnect = await testConnection();
-    if (!canConnect) {
-      throw new Error('Unable to connect to image generation service. Please check your internet connection or try again later.');
-    }
+    // Skip connection test - go straight to image generation
+    console.log('🚀 Proceeding directly to image generation...');
 
     // Create loading image first
     const loadingImage: GeneratedImage = {
