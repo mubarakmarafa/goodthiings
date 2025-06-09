@@ -141,6 +141,7 @@ export const useImageGeneration = () => {
         style_type: styleType,
         grid_position_x: gridPosition.x,
         grid_position_y: gridPosition.y,
+        user_id: user.id, // Add user ID for custom auth system
       };
       
       console.log('📤 Request body:', requestBody);
@@ -152,6 +153,7 @@ export const useImageGeneration = () => {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
           'x-openai-key': apiKey,
+          'x-user-id': user.id, // Add user ID header for custom auth
         },
         body: JSON.stringify(requestBody),
       });
@@ -224,6 +226,7 @@ export const useImageGeneration = () => {
         headers: {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'apikey': SUPABASE_ANON_KEY,
+          'x-user-id': user.id, // Add user ID header for custom auth
         },
       });
 
