@@ -167,43 +167,21 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
     loadUserImages();
   }, [loadUserImages]);
 
-  // Generate initial static items and update when generated images change
+  // SIMPLIFIED: Only show generated images for debugging
   useEffect(() => {
-    console.log('🔄 GRID ITEMS USEEFFECT RUNNING. Images count:', images.length);
-    console.log('📋 Current images array:', images);
+    console.log('🔄 SIMPLIFIED GRID: Processing', images.length, 'generated images');
+    console.log('📋 Images data:', images.map(img => ({ 
+      id: img.id, 
+      prompt: img.prompt, 
+      status: img.generation_status,
+      position: `(${img.grid_position_x}, ${img.grid_position_y})`,
+      hasUrl: !!img.image_url
+    })));
     
     const items: GridItem[] = [];
     
-    // Create a map to track generated image positions
-    const generatedPositions = new Set<string>();
-    images.forEach((image) => {
-      generatedPositions.add(`${image.grid_position_x},${image.grid_position_y}`);
-    });
-    
-    // Add static thiings icons in a repeating endless grid
-    const gridRange = 30; // Create a large grid area
-    for (let x = -gridRange; x <= gridRange; x++) {
-      for (let y = -gridRange; y <= gridRange; y++) {
-        const positionKey = `${x},${y}`;
-        
-        // Skip positions that have generated images
-        if (!generatedPositions.has(positionKey)) {
-          // Create repeating pattern using modulo to cycle through static images
-          const imageIndex = Math.abs((x * 7 + y * 11) % CONFIG.staticImages.length);
-          items.push({
-            id: `static-${x}-${y}`,
-            type: 'static',
-            gridX: x,
-            gridY: y,
-            staticIndex: imageIndex,
-          });
-        }
-      }
-    }
-
-    // Add generated images (these will overlay the static grid)
-    console.log('🔍 Processing', images.length, 'generated images for grid');
-    images.forEach((image) => {
+    // ONLY add generated images (no static images for now)
+    images.forEach((image, index) => {
       const gridItem: GridItem = {
         id: `generated-${image.id}`,
         type: image.generation_status === 'pending' ? 'loading' : 'generated',
@@ -213,22 +191,19 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
         prompt: image.prompt,
         styleType: image.style_type,
       };
-      console.log('➕ Adding generated item to grid:', gridItem);
+      console.log(`🎯 Generated item ${index + 1}:`, {
+        id: gridItem.id,
+        type: gridItem.type,
+        position: `(${gridItem.gridX}, ${gridItem.gridY})`,
+        hasImageUrl: !!gridItem.imageUrl,
+        imageUrlPreview: gridItem.imageUrl?.substring(0, 50) + '...'
+      });
       items.push(gridItem);
     });
 
-    console.log('✅ Total grid items:', items.length, 'Generated items:', images.length);
-    console.log('🔧 About to setGridItems. Previous gridItems count:', gridItems.length);
-    console.log('🔍 Current gridItems generated IDs:', gridItems.filter(item => item.id.startsWith('generated-')).map(item => item.id));
-    console.log('🔍 New items generated IDs:', items.filter(item => item.id.startsWith('generated-')).map(item => item.id));
-    
-    // Force new array reference to ensure state update
-    const newItems = [...items];
-    console.log('🔧 Created new items array reference. Length:', newItems.length);
-    setGridItems(newItems);
-    console.log('✅ setGridItems called with new array reference');
-    
-    console.log('🏁 GRID ITEMS USEEFFECT COMPLETE');
+    console.log('✅ SIMPLIFIED GRID: Total items:', items.length);
+    setGridItems([...items]);
+    console.log('✅ SIMPLIFIED GRID: State updated');
   }, [images]);
 
   // Debug: Track gridItems state changes
@@ -359,35 +334,79 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       }
   }, [itemConfigs, focusOnImage, forceUpdate]);
 
-  // Auto-select and pan to newest completed image
+  // SIMPLIFIED: Just log what images we have, no auto-focus for now
   useEffect(() => {
+    console.log('🎯 SIMPLIFIED AUTO-FOCUS: Images count:', images.length);
     if (images.length > 0) {
-      const newestImage = images[0]; // Most recent image
-      console.log('🔍 Checking newest image:', newestImage);
+      const newestImage = images[0];
+      console.log('🎯 Newest image details:', {
+        id: newestImage.id,
+        prompt: newestImage.prompt,
+        status: newestImage.generation_status,
+        position: `(${newestImage.grid_position_x}, ${newestImage.grid_position_y})`,
+        hasUrl: !!newestImage.image_url
+      });
+      console.log('🎯 Current itemConfigs length:', itemConfigs.length);
       
-      if (newestImage.generation_status === 'completed' && newestImage.id.startsWith('dev-')) {
-        console.log('✅ Found completed dev image, will auto-focus with retry logic');
-        console.log('🔍 Current itemConfigs length when auto-focus triggers:', itemConfigs.length);
-        console.log('🔍 Generated configs when auto-focus triggers:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).length);
-        
-        // Give React a moment to process state changes before starting retry logic
-        setTimeout(() => {
-          focusOnNewImage(newestImage.id, newestImage.grid_position_x, newestImage.grid_position_y);
-        }, 50);
-      }
+      // TEMPORARILY DISABLED: Auto-focus logic
+      // We'll add this back once we can see the images
+      console.log('🚫 Auto-focus temporarily disabled for debugging');
     }
-  }, [images, focusOnNewImage, itemConfigs]);
+  }, [images, itemConfigs]);
 
-  // Make functions available globally
+  // Make functions available globally for debugging
   useEffect(() => {
     (window as any).focusOnImage = focusOnImage;
     (window as any).focusOnNewImage = focusOnNewImage;
     
+    // DEBUGGING: Add function to manually navigate to generated images
+    (window as any).goToImage = (imageId: string) => {
+      const image = images.find(img => img.id === imageId);
+      if (image) {
+        console.log('🎯 Navigating to image:', image.prompt, 'at position:', image.grid_position_x, image.grid_position_y);
+        focusOnImage(image.grid_position_x, image.grid_position_y);
+      } else {
+        console.log('❌ Image not found:', imageId);
+        console.log('📋 Available images:', images.map(img => ({ id: img.id, prompt: img.prompt })));
+      }
+    };
+    
+    // DEBUGGING: Add function to go to our known image positions
+    (window as any).goToChicken = () => focusOnImage(1, 6);
+    (window as any).goToTable = () => focusOnImage(5, -9);
+    (window as any).goToOrigin = () => focusOnImage(0, 0);
+    
+    // DEBUGGING: Add function to check what's at current position
+    (window as any).checkCurrentPosition = () => {
+      if (gridRef.current && gridRef.current.publicGetCurrentPosition) {
+        const offset = gridRef.current.publicGetCurrentPosition();
+        const centerX = -Math.round(offset.x / CONFIG.gridSize);
+        const centerY = -Math.round(offset.y / CONFIG.gridSize);
+        console.log('📍 Current center position:', centerX, centerY);
+        console.log('📍 Current offset:', offset);
+        
+        // Check what images should be near this position
+        const nearbyImages = images.filter(img => 
+          Math.abs(img.grid_position_x - centerX) <= 2 && 
+          Math.abs(img.grid_position_y - centerY) <= 2
+        );
+        console.log('📍 Nearby images:', nearbyImages.map(img => ({ 
+          prompt: img.prompt, 
+          position: `(${img.grid_position_x}, ${img.grid_position_y})` 
+        })));
+      }
+    };
+    
     return () => {
       delete (window as any).focusOnImage;
       delete (window as any).focusOnNewImage;
+      delete (window as any).goToImage;
+      delete (window as any).goToChicken;
+      delete (window as any).goToTable;
+      delete (window as any).goToOrigin;
+      delete (window as any).checkCurrentPosition;
     };
-  }, [focusOnImage, focusOnNewImage]);
+  }, [focusOnImage, focusOnNewImage, images]);
 
   // Handle clicking on empty space to deselect
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
