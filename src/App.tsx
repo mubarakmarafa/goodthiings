@@ -17,6 +17,9 @@ function AppContent() {
     );
   }
 
+  // TEMPORARY: Login screen disabled for testing
+  // TODO: Re-enable authentication when ready
+  /*
   if (!user) {
     return (
       <LoginScreen 
@@ -26,6 +29,7 @@ function AppContent() {
       />
     );
   }
+  */
 
   return (
     <div className="h-screen w-screen font-sans">
