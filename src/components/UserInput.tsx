@@ -23,12 +23,30 @@ const STYLES: Style[] = [
   }
 ];
 
+// Helper function to get friendly model name
+const getModelDisplayName = (modelUsed?: string): string => {
+  if (!modelUsed) return '';
+  
+  switch (modelUsed) {
+    case 'gpt-image-1':
+      return 'GPT-Image-1';
+    case 'dall-e-3':
+      return 'DALL-E 3';
+    case 'dall-e-2':
+      return 'DALL-E 2';
+    case 'dev-mode':
+      return 'Dev Mode';
+    default:
+      return modelUsed.toUpperCase();
+  }
+};
+
 export default function UserInput() {
   const [inputValue, setInputValue] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<StyleType>('3d');
   const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
-  const { generateImage, isGenerating, canGenerate } = useImageGeneration();
+  const { generateImage, isGenerating, canGenerate, lastError } = useImageGeneration();
 
   const currentStyle = STYLES.find(style => style.id === selectedStyle) || STYLES[1];
 
@@ -53,12 +71,12 @@ export default function UserInput() {
   const handleSaveImage = () => {
     if (!previewImage) return;
     
-    // The image was already generated and is in development mode,
-    // so it should already be in the grid. Just clear the preview.
+    // The image was already generated and saved to the database
+    // Just clear the preview and show success
     setPreviewImage(null);
     toast.success('Image saved to grid! 🎨');
     
-    // Auto-pan to the image in the grid
+    // Auto-pan to the image in the grid if the function exists
     if ((window as any).focusOnNewImage) {
       (window as any).focusOnNewImage(
         previewImage.id, 
@@ -71,13 +89,19 @@ export default function UserInput() {
   const handleDiscardImage = () => {
     if (!previewImage) return;
     
-    // TODO: In production, we'd need to remove this from the database
-    // For now in dev mode, we'll just clear the preview
+    // For now, just clear the preview
+    // In a full implementation, you might want to mark the image as deleted
     setPreviewImage(null);
     toast.success('Image discarded');
   };
 
   const handleGenerate = async () => {
+    // Clear any previous errors
+    if (lastError) {
+      console.log('Clearing previous error');
+    }
+
+    // Validate input
     if (!inputValue.trim()) {
       toast.error('Please enter a prompt for your image');
       return;
@@ -89,29 +113,52 @@ export default function UserInput() {
     }
 
     const gridPosition = generateRandomPosition();
-    console.log('🎯 Generating image at position:', gridPosition);
+    console.log('🎯 Starting image generation:', {
+      prompt: inputValue.trim(),
+      style: selectedStyle,
+      position: gridPosition
+    });
 
     try {
-      // Show immediate feedback
-      toast.loading('Creating your image...', { id: 'generating' });
+      // Show loading toast
+      toast.loading('Generating your image...', { id: 'generating' });
 
-      // Generate the image (this will handle loading state internally)
+      // Generate the image
       const newImage = await generateImage(inputValue, selectedStyle, gridPosition);
       
       // Clear the input
       setInputValue('');
       
-      // Success feedback and show preview
-      toast.success('Image created! Choose to save or discard.', { id: 'generating' });
+      // Show success with model info
+      const modelName = getModelDisplayName(newImage.model_used);
+      const successMessage = modelName 
+        ? `Image created with ${modelName}! Choose to save or discard.`
+        : 'Image created! Choose to save or discard.';
       
-      console.log('🎉 Image generated successfully:', newImage);
+      toast.success(successMessage, { id: 'generating' });
       
-      // Show preview instead of auto-focusing
+      console.log('✅ Image generated successfully:', {
+        id: newImage.id,
+        model: newImage.model_used,
+        prompt: newImage.prompt
+      });
+      
+      // Show preview
       setPreviewImage(newImage);
 
     } catch (error: any) {
-      console.error('Failed to generate image:', error);
-      toast.error(error.message || 'Failed to generate image', { id: 'generating' });
+      console.error('❌ Image generation failed:', error);
+      
+      // Show error toast
+      const errorMessage = error.message || 'Failed to generate image';
+      toast.error(errorMessage, { id: 'generating' });
+      
+      // Log error details for debugging
+      console.error('Error details:', {
+        message: error.message,
+        type: typeof error,
+        error: error
+      });
     }
   };
 
@@ -120,7 +167,7 @@ export default function UserInput() {
       <div
         className={`bg-white relative rounded-3xl w-[378px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.15)] border-2 border-[rgba(213,213,213,0.5)] transition-all duration-300 ease-in-out ${
           previewImage 
-            ? 'h-[360px]' // Expanded for preview with header
+            ? 'h-[380px]' // Expanded for preview with model info
             : isDropdownOpen 
             ? 'h-[140px]' // Style dropdown
             : 'h-[70px]'  // Normal input
@@ -129,29 +176,47 @@ export default function UserInput() {
       >
         <div className="overflow-hidden h-full">
           {previewImage ? (
-                        // Preview state - show generated image with save/discard options (Figma design)
+            // Preview state - show generated image with save/discard options
             <div className="flex flex-col h-full">
-              {/* Blue Header Banner with 5px margin */}
+              {/* Blue Header Banner */}
               <div className="bg-[#6AADFF] rounded-2xl px-6 py-4 text-center m-1 mb-0">
                 <p className="text-white text-[16px] font-semibold">
                   Here's your {previewImage.prompt}
                 </p>
+                {previewImage.model_used && (
+                  <p className="text-white text-[12px] opacity-80 mt-1">
+                    Generated with {getModelDisplayName(previewImage.model_used)}
+                  </p>
+                )}
               </div>
               
               {/* White Content Area */}
               <div className="bg-white pt-6 flex flex-col flex-1 rounded-b-3xl">
-                {/* Generated Image - Large and Prominent */}
-                <div className="flex-1 flex items-center justify-center mb-6 px-8">
+                {/* Generated Image */}
+                <div className="flex-1 flex items-center justify-center mb-4 px-8">
                   <div className="flex items-center justify-center" style={{ maxWidth: '180px', maxHeight: '180px' }}>
                     <img 
                       src={previewImage.image_url} 
                       alt={previewImage.prompt}
                       className="max-w-full max-h-full object-contain drop-shadow-lg"
+                                             onError={() => {
+                         console.error('Image failed to load:', previewImage.image_url);
+                         // You could set a fallback image here
+                       }}
                     />
                   </div>
                 </div>
                 
-                {/* Action Buttons - extend to edges */}
+                {/* Show revised prompt if available */}
+                {previewImage.revised_prompt && previewImage.revised_prompt !== previewImage.prompt && (
+                  <div className="px-4 mb-4">
+                    <p className="text-xs text-gray-600 text-center">
+                      <span className="font-semibold">AI Enhanced:</span> {previewImage.revised_prompt}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Action Buttons */}
                 <div className="flex gap-3 px-1 pb-1">
                   <button
                     onClick={handleDiscardImage}
@@ -202,10 +267,11 @@ export default function UserInput() {
           ) : (
             // Normal input state
             <div className="flex flex-row items-center justify-start h-full">
-              {/* Board/Style Selector Button */}
+              {/* Style Selector Button */}
               <button 
                 onClick={toggleDropdown}
                 className="flex items-center justify-center w-[70px] h-[70px] shrink-0 bg-white hover:bg-white/80 rounded-l-3xl transition-colors p-0 border-none outline-none focus:outline-none"
+                title={`Current style: ${currentStyle.name}`}
               >
                 <img 
                   src={currentStyle.image} 
@@ -227,25 +293,24 @@ export default function UserInput() {
                       handleGenerate();
                     }
                   }}
-                  disabled={!!previewImage}
+                  disabled={isGenerating || !!previewImage}
                   className={`w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold placeholder-[#c1c1c1] ${
                     inputValue ? 'text-black' : 'text-[#c1c1c1]'
-                  } ${previewImage ? 'opacity-50' : ''}`}
+                  } ${(isGenerating || previewImage) ? 'opacity-50' : ''}`}
                 />
               </div>
 
-              {/* Send Button */}
+              {/* Generate Button */}
               <div className="pr-[5px]">
                 <button 
                   onClick={handleGenerate}
                   disabled={isGenerating || !inputValue.trim() || !!previewImage}
                   className="w-[60px] h-[60px] bg-[#6AADFF] rounded-[20px] flex items-center justify-center hover:bg-[#5A9AEF] transition-colors outline-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isGenerating ? 'Generating...' : 'Generate image'}
                 >
                   {isGenerating ? (
-                    /* Loading spinner */
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    /* Custom Paper Plane SVG */
                     <svg 
                       width="40" 
                       height="40" 

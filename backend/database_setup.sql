@@ -25,6 +25,8 @@ CREATE TABLE public.generated_images (
     grid_position_y INTEGER,
     generation_status TEXT DEFAULT 'completed' CHECK (generation_status IN ('pending', 'completed', 'failed')),
     openai_request_id TEXT,
+    model_used TEXT, -- Track which model was used (gpt-image-1, dall-e-3, dall-e-2)
+    revised_prompt TEXT, -- Store revised prompt from OpenAI (especially for DALL-E 3)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -66,6 +68,18 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_generated_images_user_id ON public.generated_images(user_id);
+CREATE INDEX IF NOT EXISTS idx_generated_images_created_at ON public.generated_images(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_generated_images_style_type ON public.generated_images(style_type);
+CREATE INDEX IF NOT EXISTS idx_generated_images_model_used ON public.generated_images(model_used);
+
+-- Migration script for existing installations
+-- Add new columns if they don't exist
+ALTER TABLE public.generated_images 
+ADD COLUMN IF NOT EXISTS model_used TEXT,
+ADD COLUMN IF NOT EXISTS revised_prompt TEXT;
 
 -- Tables created successfully! 
 -- You can add sample data later after creating a real user account. 

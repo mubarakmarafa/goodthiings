@@ -7,12 +7,156 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Types for better type safety
+interface ImageGenerationRequest {
+  prompt: string;
+  style_type: 'handdrawn' | '3d';
+  grid_position_x?: number;
+  grid_position_y?: number;
+}
+
+interface OpenAIImageResponse {
+  data: Array<{
+    url: string;
+    revised_prompt?: string;
+  }>;
+}
+
+interface ModelConfig {
+  name: string;
+  body: {
+    model: string;
+    prompt: string;
+    n: number;
+    size: string;
+    response_format: string;
+    quality?: string;
+    style?: string;
+  };
+}
+
+// Enhanced prompt generation with better style-specific prompts
+function enhancePrompt(prompt: string, styleType: 'handdrawn' | '3d'): string {
+  const basePrompt = prompt.trim();
+  
+  if (styleType === '3d') {
+    return `3D rendered icon, high quality, modern digital art style, clean background, professional lighting, vibrant colors: ${basePrompt}`;
+  } else {
+    return `Hand-drawn illustration, sketch style, artistic, clean lines, minimal background, icon-style: ${basePrompt}`;
+  }
+}
+
+// Validate OpenAI API key format
+function validateApiKey(apiKey: string): { valid: boolean; error?: string } {
+  if (!apiKey) {
+    return { valid: false, error: 'OpenAI API key is required' };
+  }
+  
+  if (!apiKey.startsWith('sk-')) {
+    return { valid: false, error: 'Invalid OpenAI API key format. Keys should start with "sk-"' };
+  }
+  
+  if (apiKey.length < 20) {
+    return { valid: false, error: 'OpenAI API key appears to be too short' };
+  }
+  
+  return { valid: true };
+}
+
+// Check if error is content-related (won't work on any model)
+function isContentError(error: any): boolean {
+  if (!error || typeof error !== 'object') return false;
+  
+  const errorCode = error.code || error.type;
+  const errorMessage = error.message || '';
+  
+  return (
+    errorCode === 'content_filter' ||
+    errorCode === 'content_policy_violation' ||
+    errorCode === 'contentFilter' ||
+    errorCode === 'image_generation_user_error' ||
+    errorMessage.toLowerCase().includes('content policy') ||
+    errorMessage.toLowerCase().includes('content filter') ||
+    errorMessage.toLowerCase().includes('safety')
+  );
+}
+
+// Parse OpenAI error for better user feedback
+function parseOpenAIError(responseText: string): string {
+  try {
+    const errorData = JSON.parse(responseText);
+    const error = errorData.error;
+    
+    if (isContentError(error)) {
+      return 'Your prompt was flagged by content moderation. Please try a different, more general description.';
+    }
+    
+    if (error?.code === 'insufficient_quota') {
+      return 'Your OpenAI API key has insufficient credits. Please check your OpenAI account billing.';
+    }
+    
+    if (error?.code === 'invalid_api_key') {
+      return 'Invalid OpenAI API key. Please check your API key and try again.';
+    }
+    
+    if (error?.code === 'rate_limit_exceeded') {
+      return 'Rate limit exceeded. Please wait a moment and try again.';
+    }
+    
+    return error?.message || 'Unknown OpenAI API error';
+  } catch {
+    return responseText || 'Unknown API error';
+  }
+}
+
+// Create model configurations with proper parameters
+function createModelConfigs(enhancedPrompt: string): ModelConfig[] {
+  return [
+    {
+      name: 'gpt-image-1',
+      body: {
+        model: 'gpt-image-1',
+        prompt: enhancedPrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high',
+        response_format: 'url'
+      }
+    },
+    {
+      name: 'dall-e-3',
+      body: {
+        model: 'dall-e-3',
+        prompt: enhancedPrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'hd',
+        style: 'vivid',
+        response_format: 'url'
+      }
+    },
+    {
+      name: 'dall-e-2',
+      body: {
+        model: 'dall-e-2',
+        prompt: enhancedPrompt.substring(0, 1000), // DALL-E 2 has shorter limit
+        n: 1,
+        size: '1024x1024',
+        response_format: 'url'
+      }
+    }
+  ];
+}
+
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    console.log('🚀 Starting image generation request');
+    
     // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -22,94 +166,75 @@ serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
-    )
+    );
 
     // Get current user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
+      console.error('❌ Authentication failed:', userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    const { prompt, style_type, grid_position_x, grid_position_y } = await req.json()
+    // Parse and validate request body
+    let requestData: ImageGenerationRequest;
+    try {
+      requestData = await req.json();
+    } catch (error) {
+      console.error('❌ Invalid JSON in request body:', error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const { prompt, style_type, grid_position_x, grid_position_y } = requestData;
+
+    // Validate required fields
     if (!prompt || !style_type) {
       return new Response(
         JSON.stringify({ error: 'Prompt and style_type are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
+    }
+
+    if (!['handdrawn', '3d'].includes(style_type)) {
+      return new Response(
+        JSON.stringify({ error: 'style_type must be "handdrawn" or "3d"' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get and validate OpenAI API key
+    const userApiKey = req.headers.get('x-openai-key');
+    const keyValidation = validateApiKey(userApiKey || '');
+    if (!keyValidation.valid) {
+      return new Response(
+        JSON.stringify({ error: keyValidation.error }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Enhance prompt based on style
-    const enhancedPrompt = style_type === '3d' 
-      ? `3D rendered, high quality, modern digital art style: ${prompt}`
-      : `Hand-drawn illustration, sketch style, artistic: ${prompt}`
+    const enhancedPrompt = enhancePrompt(prompt, style_type);
+    console.log('🎨 Enhanced prompt:', enhancedPrompt.substring(0, 100) + '...');
 
-    // Get user's OpenAI API key from request headers
-    const userApiKey = req.headers.get('x-openai-key')
-    if (!userApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key is required. Please provide your API key.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // Create model configurations
+    const modelConfigs = createModelConfigs(enhancedPrompt);
+    console.log('🤖 Available models:', modelConfigs.map(m => m.name));
 
-    // Generate image with OpenAI (trying multiple models)
-    console.log('Making OpenAI request with:', {
-      prompt: enhancedPrompt.substring(0, 100) + '...',
-      apiKeyPrefix: userApiKey.substring(0, 10) + '...',
-      promptLength: enhancedPrompt.length,
-      availableModels: ['gpt-image-1', 'dall-e-3', 'dall-e-2']
-    });
+    // Try each model in order
+    let successfulResponse: Response | null = null;
+    let modelUsed = '';
+    let lastError = '';
 
-    // Try models in order: gpt-image-1 (newest) -> DALL-E 3 -> DALL-E 2
-    let openaiResponse;
-    let modelUsed = 'gpt-image-1';
-    const models = [
-      {
-        name: 'gpt-image-1',
-        body: {
-          model: 'gpt-image-1',
-          prompt: enhancedPrompt,
-          n: 1,
-          size: '1024x1024',
-          quality: 'high', // 'low', 'medium', 'high' for gpt-image-1
-          response_format: 'url'
-        }
-      },
-      {
-        name: 'dall-e-3',
-        body: {
-          model: 'dall-e-3',
-          prompt: enhancedPrompt,
-          n: 1,
-          size: '1024x1024',
-          quality: 'hd', // 'standard' or 'hd' for DALL-E 3
-          style: 'vivid', // 'natural' or 'vivid' for DALL-E 3
-          response_format: 'url'
-        }
-      },
-      {
-        name: 'dall-e-2',
-        body: {
-          model: 'dall-e-2',
-          prompt: enhancedPrompt.substring(0, 1000), // DALL-E 2 has shorter prompt limit
-          n: 1,
-          size: '1024x1024',
-          response_format: 'url'
-        }
-      }
-    ];
-
-    let lastError = null;
-    
-    for (const modelConfig of models) {
+    for (const modelConfig of modelConfigs) {
       try {
-        console.log(`Trying ${modelConfig.name}...`);
+        console.log(`⏳ Attempting ${modelConfig.name}...`);
         
-        openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${userApiKey}`,
@@ -119,112 +244,124 @@ serve(async (req) => {
           body: JSON.stringify(modelConfig.body)
         });
 
-        console.log(`${modelConfig.name} response status:`, openaiResponse.status);
+        console.log(`📡 ${modelConfig.name} response status: ${response.status}`);
         
-        if (openaiResponse.ok) {
+        if (response.ok) {
+          successfulResponse = response;
           modelUsed = modelConfig.name;
-          break; // Success, exit the loop
+          console.log(`✅ Successfully generated image with ${modelConfig.name}`);
+          break;
         } else {
-          const errorBody = await openaiResponse.text();
-          console.log(`${modelConfig.name} failed:`, errorBody);
-          lastError = errorBody;
+          const errorText = await response.text();
+          console.log(`❌ ${modelConfig.name} failed:`, errorText);
+          lastError = errorText;
           
-          // Don't try next model if it's a content filter error (these won't work on any model)
-          try {
-            const errorJson = JSON.parse(errorBody);
-            if (errorJson.error?.code === 'content_filter' || 
-                errorJson.error?.type === 'image_generation_user_error' ||
-                errorJson.error?.code === 'contentFilter') {
-              console.log('Content filter error detected, not trying other models');
-              console.log('Error details:', errorJson.error);
-              lastError = errorBody;
-              break;
-            }
-          } catch (e) {
-            // Continue to next model if we can't parse the error
+          // Check if it's a content error - if so, don't try other models
+          const parsedError = parseOpenAIError(errorText);
+          if (parsedError.includes('content moderation') || parsedError.includes('content policy')) {
+            console.log('🚫 Content filter error - skipping other models');
+            break;
           }
         }
       } catch (fetchError) {
-        console.error(`Network error with ${modelConfig.name}:`, fetchError);
-        lastError = fetchError.message;
-        continue; // Try next model
+        console.error(`🌐 Network error with ${modelConfig.name}:`, fetchError);
+        lastError = `Network error: ${fetchError.message}`;
+        continue;
       }
     }
 
-    // Check if we got a successful response from any model
-    if (!openaiResponse || !openaiResponse.ok) {
-      console.error('All models failed. Last error:', lastError);
-      
-      // Try to parse the last error for better user feedback
-      if (lastError) {
-        try {
-          const errorJson = JSON.parse(lastError);
-          
-          // Handle content moderation errors specifically
-          if (errorJson.error?.code === 'content_filter' || 
-              errorJson.error?.type === 'image_generation_user_error' ||
-              errorJson.error?.code === 'contentFilter') {
-            throw new Error('Your prompt was flagged by the content moderation system. Please try a different, more general description.');
-          }
-          
-          // Handle other API errors
-          const errorMessage = errorJson.error?.message || lastError;
-          throw new Error(`OpenAI API error: ${errorMessage}`);
-        } catch (parseError) {
-          // If we can't parse as JSON, return the raw error
-          throw new Error(`OpenAI API error: ${lastError}`);
+    // Check if we got a successful response
+    if (!successfulResponse) {
+      console.error('❌ All models failed. Last error:', lastError);
+      const userFriendlyError = parseOpenAIError(lastError);
+      return new Response(
+        JSON.stringify({ 
+          error: userFriendlyError,
+          details: 'All image generation models failed'
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      } else {
-        throw new Error('OpenAI API error: All image generation models failed');
-      }
+      );
     }
 
     // Parse successful response
+    const openaiData: OpenAIImageResponse = await successfulResponse.json();
+    
+    if (!openaiData.data || !openaiData.data[0] || !openaiData.data[0].url) {
+      console.error('❌ Invalid OpenAI response format:', openaiData);
+      return new Response(
+        JSON.stringify({ error: 'Invalid response from image generation API' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
-    const openaiData = await openaiResponse.json()
-    const imageUrl = openaiData.data[0].url
+    const imageUrl = openaiData.data[0].url;
+    const revisedPrompt = openaiData.data[0].revised_prompt;
+
+    console.log('🖼️ Generated image URL:', imageUrl);
+    console.log('📝 Revised prompt:', revisedPrompt || 'None');
 
     // Save to database
     const { data: imageRecord, error: dbError } = await supabaseClient
       .from('generated_images')
       .insert([{
         user_id: user.id,
-        prompt,
+        prompt: prompt.trim(),
         enhanced_prompt: enhancedPrompt,
         style_type,
         image_url: imageUrl,
         grid_position_x: grid_position_x || 0,
         grid_position_y: grid_position_y || 0,
-        generation_status: 'completed'
+        generation_status: 'completed',
+        model_used: modelUsed,
+        revised_prompt: revisedPrompt || null
       }])
       .select()
-      .single()
+      .single();
 
     if (dbError) {
-      throw new Error(`Database error: ${dbError.message}`)
+      console.error('❌ Database error:', dbError);
+      return new Response(
+        JSON.stringify({ error: `Database error: ${dbError.message}` }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
+
+    console.log('💾 Image saved to database:', imageRecord.id);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         image: imageRecord,
         message: `Image generated successfully with ${modelUsed.toUpperCase()}`,
-        model_used: modelUsed
+        model_used: modelUsed,
+        revised_prompt: revisedPrompt || null
       }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
 
   } catch (error) {
-    console.error('Image generation error:', error)
+    console.error('💥 Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to generate image' }),
+      JSON.stringify({ 
+        error: 'An unexpected error occurred during image generation',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
   }
-}) 
+}); 
