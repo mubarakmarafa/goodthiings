@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -17,24 +17,27 @@ const CONFIG = {
 
 interface GridItem {
   id: string;
-  type: 'static' | 'generated' | 'loading';
+  type: 'static' | 'generated' | 'loading' | 'error';
   gridX: number;
   gridY: number;
   imageUrl?: string;
   staticIndex?: number;
   prompt?: string;
   styleType?: '3d' | 'handdrawn';
+  isLoading?: boolean;
+  loadError?: boolean;
+  retryCount?: number;
 }
 
-// Global state to track the current center position and selection
-let currentCenterPosition = { x: 0, y: 0 };
-let selectedImageState = { 
-  gridIndex: null as number | null, 
-  position: null as { x: number, y: number } | null,
-  isSelected: false,
-  isAnimating: false
-};
-let imageInteractionInProgress = false;
+// Enhanced state management
+interface GridState {
+  selectedImageIndex: number | null;
+  selectedPosition: { x: number, y: number } | null;
+  isSelected: boolean;
+  isAnimating: boolean;
+  centerPosition: { x: number, y: number };
+  lastMoveTime: number;
+}
 
 // Helper function to calculate distance-based scale
 const calculateScale = (gridX: number, gridY: number, centerX: number, centerY: number) => {
@@ -51,51 +54,75 @@ const calculateScale = (gridX: number, gridY: number, centerX: number, centerY: 
 interface ThiingsItemCellProps extends ItemConfig {
   item: GridItem;
   onFocus: (x: number, y: number) => void;
+  gridState: GridState;
+  onImageLoad?: (imageId: string) => void;
+  onImageError?: (imageId: string) => void;
 }
 
-const ThiingsItemCell = ({ gridIndex, position, isMoving, item, onFocus }: ThiingsItemCellProps) => {
-  const isSelected = selectedImageState.isSelected && selectedImageState.gridIndex === gridIndex;
+const ThiingsItemCell = ({ 
+  gridIndex, 
+  position, 
+  isMoving, 
+  item, 
+  onFocus, 
+  gridState,
+  onImageLoad,
+  onImageError
+}: ThiingsItemCellProps) => {
+  const isSelected = gridState.isSelected && gridState.selectedImageIndex === gridIndex;
+  const [imageLoadState, setImageLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
   
-  const handleImageInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleImageInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    console.log(`Item interacted: ${item.id} at position (${position.x}, ${position.y})`);
     
-    if (selectedImageState.isSelected && selectedImageState.gridIndex === gridIndex) {
+    if (gridState.isSelected && gridState.selectedImageIndex === gridIndex) {
       return;
     }
     
-    selectedImageState = {
-      gridIndex,
-      position: { x: position.x, y: position.y },
-      isSelected: true,
-      isAnimating: true
-    };
-    
     onFocus(position.x, position.y);
-  };
+  }, [gridState, gridIndex, onFocus, position]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    imageInteractionInProgress = true;
-    setTimeout(() => {
-      imageInteractionInProgress = false;
-    }, 100);
-  };
+  const handleImageLoad = useCallback(() => {
+    setImageLoadState('loaded');
+    onImageLoad?.(item.id);
+  }, [item.id, onImageLoad]);
 
-  const baseScale = calculateScale(position.x, position.y, currentCenterPosition.x, currentCenterPosition.y);
+  const handleImageError = useCallback(() => {
+    setImageLoadState('error');
+    onImageError?.(item.id);
+  }, [item.id, onImageError]);
+
+  const baseScale = calculateScale(
+    position.x, 
+    position.y, 
+    gridState.centerPosition.x, 
+    gridState.centerPosition.y
+  );
+  
   const hoverScale = isMoving ? 1.15 : 1.1;
   const selectionScale = isSelected ? 1.2 : 1;
   const finalScale = baseScale * selectionScale * (baseScale > 0.7 ? hoverScale : 1);
-  const shouldHideGridImage = isSelected && !selectedImageState.isAnimating;
+  const shouldHideGridImage = isSelected && !gridState.isAnimating;
 
-  // Determine what to render based on item type
+  // Enhanced rendering with better error handling
   const renderContent = () => {
     if (item.type === 'loading') {
       return (
         <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <div className="text-xs text-gray-500 font-medium">adding thing</div>
+            <div className="text-xs text-gray-500 font-medium">generating...</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (item.type === 'error') {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-red-100 rounded-lg border-2 border-dashed border-red-300">
+          <div className="text-center">
+            <div className="text-red-500 text-lg mb-1">⚠️</div>
+            <div className="text-xs text-red-600 font-medium">failed to load</div>
           </div>
         </div>
       );
@@ -107,25 +134,47 @@ const ThiingsItemCell = ({ gridIndex, position, isMoving, item, onFocus }: Thiin
           draggable={false}
           src={`/thiings/${CONFIG.staticImages[item.staticIndex!]}.png`}
           alt={`Static Icon ${item.staticIndex}`}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain transition-opacity duration-200"
           style={{
             filter: baseScale < 0.7 ? 'brightness(0.8)' : 'brightness(1)',
+            opacity: imageLoadState === 'loaded' ? 1 : 0.5,
           }}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
       );
     }
 
     if (item.type === 'generated' && item.imageUrl) {
       return (
-        <img
-          draggable={false}
-          src={item.imageUrl}
-          alt={item.prompt || 'Generated image'}
-          className="w-full h-full object-contain rounded-lg"
-          style={{
-            filter: baseScale < 0.7 ? 'brightness(0.8)' : 'brightness(1)',
-          }}
-        />
+        <div className="w-full h-full relative">
+          <img
+            draggable={false}
+            src={item.imageUrl}
+            alt={item.prompt || 'Generated image'}
+            className="w-full h-full object-contain rounded-lg transition-opacity duration-200"
+            style={{
+              filter: baseScale < 0.7 ? 'brightness(0.8)' : 'brightness(1)',
+              opacity: imageLoadState === 'loaded' ? 1 : 0.5,
+            }}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+          
+          {/* Loading indicator for generated images */}
+          {(item.isLoading || imageLoadState === 'loading') && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 rounded-lg">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          
+          {/* Error indicator for generated images */}
+          {(item.loadError || imageLoadState === 'error') && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-80 rounded-lg">
+              <div className="text-red-500 text-sm">⚠️</div>
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -134,10 +183,12 @@ const ThiingsItemCell = ({ gridIndex, position, isMoving, item, onFocus }: Thiin
 
   return (
     <div 
-      className={`absolute inset-1 flex items-center justify-center cursor-pointer transition-all duration-300`}
+      className={`absolute inset-1 flex items-center justify-center cursor-pointer transition-all duration-300 ${
+        isSelected ? 'z-10' : ''
+      }`}
       onClick={handleImageInteraction}
-      onTouchStart={handleTouchStart}
       data-image-cell="true"
+      data-item-id={item.id}
       style={{
         transform: `scale(${finalScale})`,
         transformOrigin: 'center',
@@ -152,89 +203,89 @@ const ThiingsItemCell = ({ gridIndex, position, isMoving, item, onFocus }: Thiin
 
 interface ThiingsGridContainerLogicProps {
   images: GeneratedImage[];
+  imageStates: Map<string, any>;
+  gridPositionMap: { [key: string]: string };
+  lastGeneratedImageId: string | null;
+  getImageAtPosition: (x: number, y: number) => GeneratedImage | null;
+  batchUpdateImages: (updates: Array<{ id: string; update: any }>) => void;
   loadUserImages: () => Promise<void>;
 }
 
-const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContainerLogicProps) => {
+const ThiingsGridContainerLogic = ({ 
+  images, 
+  imageStates, 
+  gridPositionMap, 
+  lastGeneratedImageId, 
+  getImageAtPosition,
+  batchUpdateImages,
+  loadUserImages 
+}: ThiingsGridContainerLogicProps) => {
   const gridRef = useRef<any>(null);
-  const [, forceUpdate] = useState(0);
-  const lastGridPositionRef = useRef({ x: 0, y: 0 });
-  
-  const [gridItems, setGridItems] = useState<GridItem[]>([]);
+  const [gridState, setGridState] = useState<GridState>({
+    selectedImageIndex: null,
+    selectedPosition: null,
+    isSelected: false,
+    isAnimating: false,
+    centerPosition: { x: 0, y: 0 },
+    lastMoveTime: 0,
+  });
+
+  const throttledUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load user images on mount
   useEffect(() => {
     loadUserImages();
   }, [loadUserImages]);
 
-  // SIMPLIFIED: Only show generated images for debugging
-  useEffect(() => {
-    console.log('🔄 SIMPLIFIED GRID: Processing', images.length, 'generated images');
-    console.log('📋 Images data:', images.map(img => ({ 
-      id: img.id, 
-      prompt: img.prompt, 
-      status: img.generation_status,
-      position: `(${img.grid_position_x}, ${img.grid_position_y})`,
-      hasUrl: !!img.image_url
-    })));
-    
+  // Enhanced grid items computation with better performance
+  const gridItems = useMemo(() => {
     const items: GridItem[] = [];
     
-    // ONLY add generated images (no static images for now)
-    images.forEach((image, index) => {
+    // Add generated images
+    images.forEach((image) => {
+      const imageState = imageStates.get(image.id);
+      
       const gridItem: GridItem = {
-        id: `generated-${image.id}`,
-        type: image.generation_status === 'pending' ? 'loading' : 'generated',
+        id: image.id,
+        type: image.generation_status === 'failed' ? 'error' : 
+              image.generation_status === 'pending' ? 'loading' : 'generated',
         gridX: image.grid_position_x,
         gridY: image.grid_position_y,
         imageUrl: image.image_url,
         prompt: image.prompt,
         styleType: image.style_type,
+        isLoading: imageState?.isLoading || false,
+        loadError: imageState?.loadError || false,
+        retryCount: imageState?.retryCount || 0,
       };
-      console.log(`🎯 Generated item ${index + 1}:`, {
-        id: gridItem.id,
-        type: gridItem.type,
-        position: `(${gridItem.gridX}, ${gridItem.gridY})`,
-        hasImageUrl: !!gridItem.imageUrl,
-        imageUrlPreview: gridItem.imageUrl?.substring(0, 50) + '...'
-      });
+      
       items.push(gridItem);
     });
 
-    console.log('✅ SIMPLIFIED GRID: Total items:', items.length);
-    setGridItems([...items]);
-    console.log('✅ SIMPLIFIED GRID: State updated');
-  }, [images]);
-
-  // Debug: Track gridItems state changes
-  useEffect(() => {
-    console.log('🚨 CRITICAL: GRIDITEM STATE ACTUALLY CHANGED! New count:', gridItems.length);
-    console.log('📋 GridItems state contains generated items:', gridItems.filter(item => item.id.startsWith('generated-')).map(item => item.id));
-  }, [gridItems]);
+    return items;
+  }, [images, imageStates]);
 
   // Convert gridItems to indexed format for ThiingsGrid
   const itemConfigs = useMemo(() => {
-    console.log('🔄 ITEMCONFIGS USEMEMO RUNNING. GridItems count:', gridItems.length);
-    console.log('🔍 GridItems input to useMemo:', gridItems.slice(0, 5).map(item => ({ id: item.id, type: item.type, pos: `${item.gridX},${item.gridY}` })));
-    const configs = gridItems.map((item, index) => ({
+    return gridItems.map((item, index) => ({
       gridIndex: index,
       position: { x: item.gridX, y: item.gridY },
       item,
     }));
-    console.log('✅ ItemConfigs created. Count:', configs.length);
-    
-    const generatedConfigs = configs.filter(c => c.item.id.startsWith('generated-'));
-    console.log('📋 Generated items in configs:', generatedConfigs.map(c => c.item.id));
-    console.log('🔍 Generated config details:', generatedConfigs.map(c => ({ 
-      id: c.item.id, 
-      type: c.item.type, 
-      pos: `${c.item.gridX},${c.item.gridY}`,
-      index: c.gridIndex 
-    })));
-    return configs;
   }, [gridItems]);
 
-  // Function to smoothly animate to center an image
+  // Throttled grid state updates
+  const updateGridState = useCallback((updates: Partial<GridState>) => {
+    if (throttledUpdateRef.current) {
+      clearTimeout(throttledUpdateRef.current);
+    }
+    
+    throttledUpdateRef.current = setTimeout(() => {
+      setGridState(prev => ({ ...prev, ...updates }));
+    }, 16); // ~60fps throttling
+  }, []);
+
+  // Enhanced focus function with better animation
   const focusOnImage = useCallback((gridX: number, gridY: number) => {
     if (!gridRef.current) return;
 
@@ -242,13 +293,27 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
     const targetOffsetY = -gridY * CONFIG.gridSize;
     const currentOffset = gridRef.current.publicGetCurrentPosition();
     
-    lastGridPositionRef.current = { x: currentOffset.x, y: currentOffset.y };
+    // Find the image at this position
+    const targetImageIndex = itemConfigs.findIndex(
+      config => config.position.x === gridX && config.position.y === gridY
+    );
     
+    if (targetImageIndex === -1) return;
+
+    // Update selection state
+    setGridState(prev => ({
+      ...prev,
+      selectedImageIndex: targetImageIndex,
+      selectedPosition: { x: gridX, y: gridY },
+      isSelected: true,
+      isAnimating: true,
+    }));
+
+    // Animate to position
     const startTime = Date.now();
-    const duration = 800;
+    const duration = 600; // Slightly faster animation
     const startX = currentOffset.x;
     const startY = currentOffset.y;
-    let lastUpdateTime = 0;
     
     const animateToPosition = () => {
       const elapsed = Date.now() - startTime;
@@ -260,233 +325,127 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       const currentX = startX + (targetOffsetX - startX) * easedProgress;
       const currentY = startY + (targetOffsetY - startY) * easedProgress;
       
-      if (gridRef.current && gridRef.current.setState) {
+      if (gridRef.current?.setState) {
         gridRef.current.setState({
           offset: { x: currentX, y: currentY },
           restPos: { x: currentX, y: currentY },
           velocity: { x: 0, y: 0 }
         });
         
-        const now = Date.now();
-        if (gridRef.current.publicForceUpdate && now - lastUpdateTime > 66) {
-          gridRef.current.publicForceUpdate();
-          lastUpdateTime = now;
-        }
+        gridRef.current.publicForceUpdate?.();
       }
       
       if (progress < 1) {
         requestAnimationFrame(animateToPosition);
       } else {
-        selectedImageState.isAnimating = false;
-        lastGridPositionRef.current = { x: currentX, y: currentY };
-        
-        if (gridRef.current && gridRef.current.publicForceUpdate) {
-          gridRef.current.publicForceUpdate();
-        }
-        
-        forceUpdate(prev => prev + 1);
+        setGridState(prev => ({
+          ...prev,
+          isAnimating: false,
+        }));
       }
     };
     
     requestAnimationFrame(animateToPosition);
-  }, []);
+  }, [itemConfigs]);
 
-  // Function to focus on and select a new image by ID with retry logic
-  const focusOnNewImage = useCallback((imageId: string, gridX: number, gridY: number, retryCount = 0) => {
-    console.log(`🎯 Focusing on new image (attempt ${retryCount + 1}):`, imageId, 'at position:', gridX, gridY);
-    console.log('🔍 ItemConfigs available for search. Count:', itemConfigs.length);
-    console.log('🔍 Generated items in itemConfigs:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).map(c => c.item.id));
-    console.log('🔍 Looking for ID:', `generated-${imageId}`);
+  // Auto-focus on new images with simplified logic
+  useEffect(() => {
+    if (!lastGeneratedImageId) return;
     
-    // Find the grid index of this image
-    const imageIndex = itemConfigs.findIndex(config => config.item.id === `generated-${imageId}`);
-    console.log('🔍 Found image index:', imageIndex);
+    const newImageConfig = itemConfigs.find(
+      config => config.item.id === lastGeneratedImageId
+    );
     
-    if (imageIndex !== -1) {
-      // Found it! Set selection state
-      selectedImageState = {
-        gridIndex: imageIndex,
-        position: { x: gridX, y: gridY },
-        isSelected: true,
-        isAnimating: true
-      };
+    if (newImageConfig) {
+      console.log('🎯 Auto-focusing on new image:', newImageConfig.item.prompt);
       
-      console.log('🚀 Setting selection state and panning to:', { gridX, gridY });
-      
-      // Pan to the image
-      focusOnImage(gridX, gridY);
-      
-      console.log('✅ Auto-selected new image at index:', imageIndex);
-      
-      // Force a re-render to ensure selection is visible
-      forceUpdate(prev => prev + 1);
-    } else if (retryCount < 10) {
-      // Not found yet, retry in 100ms (max 10 attempts = 1 second total)
-      console.log(`⏳ Image not found yet, retrying in 100ms (attempt ${retryCount + 1}/10)`);
+      // Small delay to ensure rendering is complete
       setTimeout(() => {
-        focusOnNewImage(imageId, gridX, gridY, retryCount + 1);
-      }, 100);
-          } else {
-        // Give up after 1 second
-        console.log('❌ Could not find image after 10 attempts. Available IDs:', itemConfigs.slice(0, 5).map(c => c.item.id));
-        console.log('❌ DEBUGGING: itemConfigs length at failure:', itemConfigs.length);
-        console.log('❌ DEBUGGING: Total generated configs at failure:', itemConfigs.filter(c => c.item.id.startsWith('generated-')).length);
-      }
-  }, [itemConfigs, focusOnImage, forceUpdate]);
-
-  // SIMPLIFIED: Just log what images we have, no auto-focus for now
-  useEffect(() => {
-    console.log('🎯 SIMPLIFIED AUTO-FOCUS: Images count:', images.length);
-    if (images.length > 0) {
-      const newestImage = images[0];
-      console.log('🎯 Newest image details:', {
-        id: newestImage.id,
-        prompt: newestImage.prompt,
-        status: newestImage.generation_status,
-        position: `(${newestImage.grid_position_x}, ${newestImage.grid_position_y})`,
-        hasUrl: !!newestImage.image_url
-      });
-      console.log('🎯 Current itemConfigs length:', itemConfigs.length);
-      
-      // TEMPORARILY DISABLED: Auto-focus logic
-      // We'll add this back once we can see the images
-      console.log('🚫 Auto-focus temporarily disabled for debugging');
+        focusOnImage(newImageConfig.position.x, newImageConfig.position.y);
+      }, 200);
     }
-  }, [images, itemConfigs]);
-
-  // Make functions available globally for debugging
-  useEffect(() => {
-    (window as any).focusOnImage = focusOnImage;
-    (window as any).focusOnNewImage = focusOnNewImage;
-    
-    // DEBUGGING: Add function to manually navigate to generated images
-    (window as any).goToImage = (imageId: string) => {
-      const image = images.find(img => img.id === imageId);
-      if (image) {
-        console.log('🎯 Navigating to image:', image.prompt, 'at position:', image.grid_position_x, image.grid_position_y);
-        focusOnImage(image.grid_position_x, image.grid_position_y);
-      } else {
-        console.log('❌ Image not found:', imageId);
-        console.log('📋 Available images:', images.map(img => ({ id: img.id, prompt: img.prompt })));
-      }
-    };
-    
-    // DEBUGGING: Add function to go to our known image positions
-    (window as any).goToChicken = () => focusOnImage(1, 6);
-    (window as any).goToTable = () => focusOnImage(5, -9);
-    (window as any).goToOrigin = () => focusOnImage(0, 0);
-    
-    // DEBUGGING: Add function to check what's at current position
-    (window as any).checkCurrentPosition = () => {
-      if (gridRef.current && gridRef.current.publicGetCurrentPosition) {
-        const offset = gridRef.current.publicGetCurrentPosition();
-        const centerX = -Math.round(offset.x / CONFIG.gridSize);
-        const centerY = -Math.round(offset.y / CONFIG.gridSize);
-        console.log('📍 Current center position:', centerX, centerY);
-        console.log('📍 Current offset:', offset);
-        
-        // Check what images should be near this position
-        const nearbyImages = images.filter(img => 
-          Math.abs(img.grid_position_x - centerX) <= 2 && 
-          Math.abs(img.grid_position_y - centerY) <= 2
-        );
-        console.log('📍 Nearby images:', nearbyImages.map(img => ({ 
-          prompt: img.prompt, 
-          position: `(${img.grid_position_x}, ${img.grid_position_y})` 
-        })));
-      }
-    };
-    
-    return () => {
-      delete (window as any).focusOnImage;
-      delete (window as any).focusOnNewImage;
-      delete (window as any).goToImage;
-      delete (window as any).goToChicken;
-      delete (window as any).goToTable;
-      delete (window as any).goToOrigin;
-      delete (window as any).checkCurrentPosition;
-    };
-  }, [focusOnImage, focusOnNewImage, images]);
+  }, [lastGeneratedImageId, itemConfigs, focusOnImage]);
 
   // Handle clicking on empty space to deselect
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && selectedImageState.isSelected) {
-      selectedImageState = {
-        gridIndex: null,
-        position: null,
+    if (e.target === e.currentTarget && gridState.isSelected) {
+      setGridState(prev => ({
+        ...prev,
+        selectedImageIndex: null,
+        selectedPosition: null,
         isSelected: false,
-        isAnimating: false
-      };
-      forceUpdate(prev => prev + 1);
-      console.log("Image deselected by clicking background");
+        isAnimating: false,
+      }));
     }
-  }, []);
+  }, [gridState.isSelected]);
 
   // Handle escape key to deselect
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectedImageState.isSelected) {
-        selectedImageState = {
-          gridIndex: null,
-          position: null,
+      if (e.key === 'Escape' && gridState.isSelected) {
+        setGridState(prev => ({
+          ...prev,
+          selectedImageIndex: null,
+          selectedPosition: null,
           isSelected: false,
-          isAnimating: false
-        };
-        forceUpdate(prev => prev + 1);
-        console.log("Image deselected with Escape key");
+          isAnimating: false,
+        }));
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [gridState.isSelected]);
 
-  // Position tracking and center calculation
+  // Enhanced position tracking with better performance
   useEffect(() => {
-    if (gridRef.current && gridRef.current.publicGetCurrentPosition) {
-      const initialOffset = gridRef.current.publicGetCurrentPosition();
-      lastGridPositionRef.current = { x: initialOffset.x, y: initialOffset.y };
-    }
-
     let lastUpdateTime = 0;
+    let animationFrame: number;
+    
     const updateCenterPosition = () => {
-      if (gridRef.current && gridRef.current.publicGetCurrentPosition) {
-        const offset = gridRef.current.publicGetCurrentPosition();
-        
-        if (selectedImageState.isSelected && !selectedImageState.isAnimating) {
-          const lastPos = lastGridPositionRef.current;
-          const deltaX = Math.abs(offset.x - lastPos.x);
-          const deltaY = Math.abs(offset.y - lastPos.y);
-          const threshold = 10;
+      if (!gridRef.current?.publicGetCurrentPosition) return;
+      
+      const offset = gridRef.current.publicGetCurrentPosition();
+      const centerX = -Math.round(offset.x / CONFIG.gridSize);
+      const centerY = -Math.round(offset.y / CONFIG.gridSize);
+      
+      const now = Date.now();
+      
+      // Movement detection for deselection
+      if (gridState.isSelected && !gridState.isAnimating) {
+        const deltaTime = now - gridState.lastMoveTime;
+        if (deltaTime > 100) { // 100ms threshold
+          const currentCenter = gridState.centerPosition;
+          const hasMovedSignificantly = 
+            Math.abs(centerX - currentCenter.x) > 0 || 
+            Math.abs(centerY - currentCenter.y) > 0;
           
-          if (deltaX > threshold || deltaY > threshold) {
-            console.log(`Grid movement detected (${deltaX.toFixed(1)}, ${deltaY.toFixed(1)}) - deselecting image`);
-            selectedImageState = {
-              gridIndex: null,
-              position: null,
+          if (hasMovedSignificantly) {
+            setGridState(prev => ({
+              ...prev,
+              selectedImageIndex: null,
+              selectedPosition: null,
               isSelected: false,
-              isAnimating: false
-            };
-            forceUpdate(prev => prev + 1);
+              isAnimating: false,
+            }));
           }
         }
-        
-        lastGridPositionRef.current = { x: offset.x, y: offset.y };
-        
-        const centerX = -Math.round(offset.x / CONFIG.gridSize);
-        const centerY = -Math.round(offset.y / CONFIG.gridSize);
-        
-        // Only update if center position actually changed (throttled to 30fps)
-        const now = Date.now();
-        if ((currentCenterPosition.x !== centerX || currentCenterPosition.y !== centerY) && now - lastUpdateTime > 33) {
-          currentCenterPosition = { x: centerX, y: centerY };
-          lastUpdateTime = now;
-          forceUpdate(prev => prev + 1);
-        }
+      }
+      
+      // Throttled center position updates
+      if (
+        (gridState.centerPosition.x !== centerX || gridState.centerPosition.y !== centerY) && 
+        now - lastUpdateTime > 33 // ~30fps
+      ) {
+        setGridState(prev => ({
+          ...prev,
+          centerPosition: { x: centerX, y: centerY },
+          lastMoveTime: now,
+        }));
+        lastUpdateTime = now;
       }
     };
 
-    let animationFrame: number;
     const animate = () => {
       updateCenterPosition();
       animationFrame = requestAnimationFrame(animate);
@@ -499,9 +458,26 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, []); // Cleanup handled by wrapper component
+  }, [gridState]);
 
-  // Custom render function that passes the item data
+  // Image loading callbacks for better UX
+  const handleImageLoad = useCallback((imageId: string) => {
+    console.log('✅ Image loaded:', imageId);
+    
+    // Update image state to mark as loaded
+    const updates = [{ id: imageId, update: { isLoading: false, loadError: false } }];
+    batchUpdateImages(updates);
+  }, [batchUpdateImages]);
+
+  const handleImageError = useCallback((imageId: string) => {
+    console.error('❌ Image failed to load:', imageId);
+    
+    // Update image state to mark as error
+    const updates = [{ id: imageId, update: { isLoading: false, loadError: true } }];
+    batchUpdateImages(updates);
+  }, [batchUpdateImages]);
+
+  // Custom render function with enhanced props
   const renderGridItem = useCallback((config: ItemConfig) => {
     const itemConfig = itemConfigs.find(item => item.gridIndex === config.gridIndex);
     if (!itemConfig) return null;
@@ -511,9 +487,21 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
         {...config}
         item={itemConfig.item}
         onFocus={focusOnImage}
+        gridState={gridState}
+        onImageLoad={handleImageLoad}
+        onImageError={handleImageError}
       />
     );
-  }, [itemConfigs, focusOnImage]);
+  }, [itemConfigs, focusOnImage, gridState, handleImageLoad, handleImageError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (throttledUpdateRef.current) {
+        clearTimeout(throttledUpdateRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div 
@@ -521,40 +509,26 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
       onClick={handleBackgroundClick}
     >
       <div
-        onMouseDown={() => {
-          if (selectedImageState.isSelected) {
-            console.log("Grid mouse interaction detected - deselecting image");
-            selectedImageState = {
-              gridIndex: null,
-              position: null,
+        onMouseDown={(e) => {
+          if (gridState.isSelected) {
+            setGridState(prev => ({
+              ...prev,
+              selectedImageIndex: null,
+              selectedPosition: null,
               isSelected: false,
-              isAnimating: false
-            };
-            forceUpdate(prev => prev + 1);
+              isAnimating: false,
+            }));
           }
         }}
-        onTouchStart={() => {
-          if (selectedImageState.isSelected && !imageInteractionInProgress) {
-            console.log("Grid touch interaction detected - deselecting image");
-            selectedImageState = {
-              gridIndex: null,
-              position: null,
+        onWheel={(e) => {
+          if (gridState.isSelected) {
+            setGridState(prev => ({
+              ...prev,
+              selectedImageIndex: null,
+              selectedPosition: null,
               isSelected: false,
-              isAnimating: false
-            };
-            forceUpdate(prev => prev + 1);
-          }
-        }}
-        onWheel={() => {
-          if (selectedImageState.isSelected) {
-            console.log("Grid wheel/trackpad interaction detected - deselecting image");
-            selectedImageState = {
-              gridIndex: null,
-              position: null,
-              isSelected: false,
-              isAnimating: false
-            };
-            forceUpdate(prev => prev + 1);
+              isAnimating: false,
+            }));
           }
         }}
       >
@@ -566,10 +540,9 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
         />
       </div>
 
-      {/* Floating draggable image when selected */}
-      {selectedImageState.isSelected && selectedImageState.gridIndex !== null && !selectedImageState.isAnimating && (() => {
-        const selectedIndex = selectedImageState.gridIndex;
-        const selectedItem = itemConfigs[selectedIndex]?.item;
+      {/* Enhanced floating image with better performance */}
+      {gridState.isSelected && gridState.selectedImageIndex !== null && !gridState.isAnimating && (() => {
+        const selectedItem = itemConfigs[gridState.selectedImageIndex]?.item;
         
         if (!selectedItem) return null;
 
@@ -603,7 +576,7 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
               <img
                 draggable={true}
                 src={imageUrl}
-                alt={selectedItem.prompt || `Selected item ${selectedIndex}`}
+                alt={selectedItem.prompt || `Selected item ${gridState.selectedImageIndex}`}
                 className="w-full h-full object-contain shadow-2xl relative rounded-lg"
                 style={{
                   filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.3))',
@@ -611,8 +584,6 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
                   zIndex: 2,
                 }}
                 onDragStart={async (e) => {
-                  console.log(`🚀 Starting drag of floating image ${selectedIndex}`);
-                  
                   const fileName = selectedItem.type === 'static' 
                     ? `thiings-icon-${selectedItem.staticIndex}.png`
                     : `generated-${selectedItem.prompt?.replace(/\s+/g, '-').toLowerCase()}.png`;
@@ -628,25 +599,13 @@ const ThiingsGridContainerLogic = ({ images, loadUserImages }: ThiingsGridContai
                     const pngBlob = new Blob([blob], { type: 'image/png' });
                     e.dataTransfer.items.add(new File([pngBlob], fileName, { type: 'image/png' }));
                     e.dataTransfer.effectAllowed = "copy";
-                    console.log(`✅ PNG file ready for drag: ${fileName}`);
                   } catch (error) {
-                    console.log("❌ Could not prepare PNG file:", error);
+                    console.log("Could not prepare PNG file:", error);
                     e.dataTransfer.setData("text/uri-list", imageUrl);
                     e.dataTransfer.effectAllowed = "copyLink";
                   }
                 }}
-                onDragEnd={() => {
-                  console.log(`✅ Drag completed for image ${selectedIndex}`);
-                }}
-                onMouseDown={(e) => {
-                  console.log(`Mouse down on floating image ${selectedIndex}`);
-                  e.stopPropagation();
-                }}
-              />
-              
-              <div 
-                className="absolute inset-0 bg-blue-500/5 rounded-lg pointer-events-none" 
-                style={{ zIndex: 0 }}
+                onMouseDown={(e) => e.stopPropagation()}
               />
             </div>
           </div>
@@ -666,7 +625,7 @@ const DebugPanel = () => {
     try {
       const canConnect = await testConnection();
       if (canConnect) {
-        toast.success('✅ Server reachable! CORS issue confirmed.', { id: 'test-connection', duration: 5000 });
+        toast.success('✅ Server reachable!', { id: 'test-connection', duration: 3000 });
       } else {
         toast.error('❌ Server unreachable', { id: 'test-connection' });
       }
@@ -692,46 +651,38 @@ const DebugPanel = () => {
         >
           🔍 Test Connection
         </button>
-        <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
-          <div className="font-semibold text-orange-800 mb-1">⚠️ Known Issue:</div>
-          <div className="text-orange-700">CORS policy blocks image generation. Edge Function needs CORS headers.</div>
-        </div>
       </div>
     </div>
   );
 };
 
-// Wrapper component that only renders the logic when user exists
+// Enhanced wrapper component
 export const ThiingsGridContainer = () => {
   const { user } = useAuth();
-  const { images, loadUserImages } = useImageGeneration();
+  const { 
+    images, 
+    imageStates, 
+    gridPositionMap, 
+    lastGeneratedImageId, 
+    getImageAtPosition,
+    batchUpdateImages,
+    loadUserImages 
+  } = useImageGeneration();
 
-  // Debug: Track images prop changes in wrapper
-  useEffect(() => {
-    console.log('🚨 WRAPPER: Images prop changed! Count:', images.length);
-    console.log('🚨 WRAPPER: Images array:', images.map(img => ({ id: img.id, status: img.generation_status })));
-  }, [images]);
-
-  // Debug: Track renders
-  console.log('🔄 WRAPPER: Component rendering. User exists:', !!user, 'Images count:', images.length);
-
-  // Only render heavy components when user exists
-  if (!user) {
-    // Reset global state when no user
-    currentCenterPosition = { x: 0, y: 0 };
-    selectedImageState = {
-      gridIndex: null,
-      position: null,
-      isSelected: false,
-      isAnimating: false
-    };
-    imageInteractionInProgress = false;
-    return null;
-  }
+  // Only render when user exists
+  if (!user) return null;
 
   return (
     <>
-      <ThiingsGridContainerLogic images={images} loadUserImages={loadUserImages} />
+      <ThiingsGridContainerLogic 
+        images={images}
+        imageStates={imageStates}
+        gridPositionMap={gridPositionMap}
+        lastGeneratedImageId={lastGeneratedImageId}
+        getImageAtPosition={getImageAtPosition}
+        batchUpdateImages={batchUpdateImages}
+        loadUserImages={loadUserImages}
+      />
       <DebugPanel />
     </>
   );
