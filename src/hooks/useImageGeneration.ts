@@ -25,8 +25,6 @@ export const useImageGeneration = () => {
   // Test connection to Edge Function with proper OPTIONS request
   const testConnection = async (): Promise<boolean> => {
     try {
-      console.log('🔍 Testing Edge Function connection...');
-      
       // Use OPTIONS request to test CORS and connectivity
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-generate`, {
         method: 'OPTIONS',
@@ -36,13 +34,10 @@ export const useImageGeneration = () => {
         },
       });
       
-      console.log('🔍 Connection test result:', response.status);
-      console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
-      
       // OPTIONS should return 200 if CORS is properly configured
       return response.status === 200;
     } catch (error) {
-      console.error('🔍 Connection test failed:', error);
+      console.error('Connection test failed:', error);
       return false;
     }
   };
@@ -65,9 +60,6 @@ export const useImageGeneration = () => {
       throw new Error('Invalid OpenAI API key format. API keys should start with "sk-"');
     }
 
-    // Skip connection test - go straight to image generation
-    console.log('🚀 Proceeding directly to image generation...');
-
     // Create loading image first
     const loadingImage: GeneratedImage = {
       id: `loading-${Date.now()}`,
@@ -83,18 +75,11 @@ export const useImageGeneration = () => {
     };
 
     // Add loading image to state immediately
-    console.log('🔄 Adding loading image to state:', loadingImage);
-    setImages(prev => {
-      const newImages = [loadingImage, ...prev];
-      console.log('🔄 Updated images state (after adding loading):', newImages.length, 'images');
-      return newImages;
-    });
+    setImages(prev => [loadingImage, ...prev]);
 
     // Check if using development bypass
     const isDevMode = user.id === 'dev-user-123';
     if (isDevMode) {
-      console.log('🚧 Development mode - simulating image generation...');
-      
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -113,24 +98,13 @@ export const useImageGeneration = () => {
       };
       
       // Replace loading image with completed image
-      console.log('🔄 Replacing loading image with completed image:', fakeImage);
-      setImages(prev => {
-        const updatedImages = prev.map(img => img.id === loadingImage.id ? fakeImage : img);
-        console.log('🔄 Updated images state (after replacement):', updatedImages.length, 'images');
-        console.log('🔄 All image IDs:', updatedImages.map(img => img.id));
-        return updatedImages;
-      });
-      console.log('✅ Development image generated:', fakeImage);
+      setImages(prev => prev.map(img => img.id === loadingImage.id ? fakeImage : img));
       return fakeImage;
     }
 
     setIsGenerating(true);
 
     try {
-      console.log('🎨 Generating image:', { prompt, styleType, gridPosition });
-      console.log('🔑 API Key preview:', apiKey ? `${apiKey.slice(0, 10)}...` : 'NO API KEY');
-      console.log('👤 User ID:', user.id);
-
       const requestBody = {
         prompt: prompt.trim(),
         style_type: styleType,
@@ -138,8 +112,6 @@ export const useImageGeneration = () => {
         grid_position_y: gridPosition.y,
         user_id: user.id, // Add user ID for custom auth system
       };
-      
-      console.log('📤 Request body:', requestBody);
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-generate`, {
         method: 'POST',
@@ -153,12 +125,8 @@ export const useImageGeneration = () => {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Server response:', response.status, errorText);
         
         // Provide more specific error messages based on status code
         if (response.status === 401) {
@@ -175,23 +143,19 @@ export const useImageGeneration = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Image generated successfully:', data);
-
       const newImage = data.image as GeneratedImage;
+      
       // Replace loading image with completed image
       setImages(prev => prev.map(img => img.id === loadingImage.id ? newImage : img));
 
       // Also reload all images from database to ensure we have the latest data
-      console.log('🔄 Reloading all user images after successful generation...');
       setTimeout(() => {
         loadUserImages();
       }, 1000); // Small delay to ensure database is fully updated
 
       return newImage;
     } catch (error) {
-      console.error('❌ Image generation failed:', error);
-      console.error('❌ Error type:', error instanceof TypeError ? 'TypeError' : typeof error);
-      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Image generation failed:', error);
       
       // Remove loading image on error
       setImages(prev => prev.filter(img => img.id !== loadingImage.id));
@@ -210,22 +174,17 @@ export const useImageGeneration = () => {
 
   const loadUserImages = useCallback(async () => {
     if (!user) {
-      console.log('🚫 loadUserImages: No user found, skipping');
       return;
     }
 
     // Check if using development bypass
     const isDevMode = user.id === 'dev-user-123';
     if (isDevMode) {
-      console.log('🚧 Development mode - skipping image loading from server');
       setImages([]); // Start with empty images in dev mode
       return;
     }
 
     try {
-      console.log('📚 Loading user images for user:', user.id, user.username);
-      console.log('📚 Making request to:', `${SUPABASE_URL}/functions/v1/images-list`);
-
       const response = await fetch(`${SUPABASE_URL}/functions/v1/images-list`, {
         method: 'GET',
         headers: {
@@ -235,35 +194,19 @@ export const useImageGeneration = () => {
         },
       });
 
-      console.log('📚 Response status:', response.status);
-      console.log('📚 Response headers:', Object.fromEntries(response.headers.entries()));
-
       const data = await response.json();
-      console.log('📚 Response data:', data);
 
       if (response.ok) {
-        console.log('✅ Setting images state with:', data.images?.length || 0, 'images');
-        console.log('📋 Images data:', data.images);
         setImages(data.images || []);
-        console.log('✅ Images state updated successfully');
       } else {
-        console.error('❌ Failed to load images - bad response:', response.status, data);
+        console.error('Failed to load images:', response.status, data);
       }
     } catch (error) {
-      console.error('❌ Failed to load images - exception:', error);
+      console.error('Failed to load images:', error);
     }
   }, [user]);
 
-  // Expose loadUserImages globally for debugging
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).loadUserImages = loadUserImages;
-      (window as any).debugImages = () => {
-        console.log('🔍 Current images state:', images);
-        console.log('🔍 User info:', { id: user?.id, username: user?.username });
-      };
-    }
-  }, [loadUserImages, images, user]);
+
 
   return {
     generateImage,
