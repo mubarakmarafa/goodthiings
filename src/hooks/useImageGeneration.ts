@@ -18,7 +18,7 @@ export interface GeneratedImage {
 }
 
 export const useImageGeneration = () => {
-  const { user, apiKey } = useAuth();
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
 
@@ -45,14 +45,19 @@ export const useImageGeneration = () => {
   const generateImage = async (
     prompt: string,
     styleType: '3d' | 'handdrawn',
-    gridPosition: { x: number; y: number }
+    gridPosition: { x: number; y: number },
+    apiKey: string
   ): Promise<GeneratedImage> => {
-    if (!user || !apiKey) {
-      throw new Error('Please log in and provide an API key');
+    if (!user) {
+      throw new Error('Please log in to generate images');
     }
 
     if (!prompt.trim()) {
       throw new Error('Please enter a prompt');
+    }
+
+    if (!apiKey.trim()) {
+      throw new Error('Please provide an OpenAI API key');
     }
 
     // Validate API key format (OpenAI keys start with 'sk-')
@@ -206,14 +211,12 @@ export const useImageGeneration = () => {
     }
   }, [user]);
 
-
-
   return {
     generateImage,
     loadUserImages,
     testConnection,
     isGenerating,
     images,
-    canGenerate: !!(user && apiKey),
+    canGenerate: !!user,
   };
 }; 

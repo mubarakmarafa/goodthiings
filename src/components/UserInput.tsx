@@ -25,9 +25,11 @@ const STYLES: Style[] = [
 
 export default function UserInput() {
   const [inputValue, setInputValue] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<StyleType>('3d');
   const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const { generateImage, isGenerating, canGenerate } = useImageGeneration();
 
   const currentStyle = STYLES.find(style => style.id === selectedStyle) || STYLES[1];
@@ -56,6 +58,8 @@ export default function UserInput() {
     // The image was already generated and is in development mode,
     // so it should already be in the grid. Just clear the preview.
     setPreviewImage(null);
+    setApiKey(''); // Clear API key for security
+    setShowApiKeyInput(false);
     toast.success('Image saved to grid! 🎨');
     
     // Auto-pan to the image in the grid
@@ -74,7 +78,24 @@ export default function UserInput() {
     // TODO: In production, we'd need to remove this from the database
     // For now in dev mode, we'll just clear the preview
     setPreviewImage(null);
+    setApiKey(''); // Clear API key for security
+    setShowApiKeyInput(false);
     toast.success('Image discarded');
+  };
+
+  const handleInitialGenerate = () => {
+    if (!inputValue.trim()) {
+      toast.error('Please enter a prompt for your image');
+      return;
+    }
+
+    if (!canGenerate) {
+      toast.error('Please log in to generate images');
+      return;
+    }
+
+    // Show API key input
+    setShowApiKeyInput(true);
   };
 
   const handleGenerate = async () => {
@@ -83,8 +104,13 @@ export default function UserInput() {
       return;
     }
 
-    if (!canGenerate) {
-      toast.error('Please log in and provide an OpenAI API key');
+    if (!apiKey.trim()) {
+      toast.error('Please enter your OpenAI API key');
+      return;
+    }
+
+    if (!apiKey.startsWith('sk-')) {
+      toast.error('OpenAI API key should start with "sk-"');
       return;
     }
 
@@ -95,8 +121,8 @@ export default function UserInput() {
       // Show immediate feedback
       toast.loading('Creating your image...', { id: 'generating' });
 
-      // Generate the image (this will handle loading state internally)
-      const newImage = await generateImage(inputValue, selectedStyle, gridPosition);
+      // Generate the image with the provided API key
+      const newImage = await generateImage(inputValue, selectedStyle, gridPosition, apiKey);
       
       // Clear the input
       setInputValue('');
@@ -115,12 +141,19 @@ export default function UserInput() {
     }
   };
 
+  const handleBackToPrompt = () => {
+    setShowApiKeyInput(false);
+    setApiKey('');
+  };
+
   return (
     <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-10">
       <div
         className={`bg-white relative rounded-3xl w-[378px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.15)] border-2 border-[rgba(213,213,213,0.5)] transition-all duration-300 ease-in-out ${
           previewImage 
             ? 'h-[360px]' // Expanded for preview with header
+            : showApiKeyInput
+            ? 'h-[140px]' // API key input
             : isDropdownOpen 
             ? 'h-[140px]' // Style dropdown
             : 'h-[70px]'  // Normal input
@@ -129,7 +162,7 @@ export default function UserInput() {
       >
         <div className="overflow-hidden h-full">
           {previewImage ? (
-                        // Preview state - show generated image with save/discard options (Figma design)
+            // Preview state - show generated image with save/discard options
             <div className="flex flex-col h-full">
               {/* Blue Header Banner with 5px margin */}
               <div className="bg-[#6AADFF] rounded-2xl px-6 py-4 text-center m-1 mb-0">
@@ -166,6 +199,47 @@ export default function UserInput() {
                     Save
                   </button>
                 </div>
+              </div>
+            </div>
+          ) : showApiKeyInput ? (
+            // API Key input state
+            <div className="flex flex-col h-full">
+              {/* API Key Input */}
+              <div className="flex-1 flex items-center justify-center px-4">
+                <div className="w-full">
+                  <input
+                    type="password"
+                    placeholder="Enter your OpenAI API key (sk-...)"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isGenerating && apiKey.trim()) {
+                        e.preventDefault();
+                        handleGenerate();
+                      }
+                    }}
+                    className="w-full bg-[#f3f3f3] rounded-2xl border-none outline-none text-[16px] font-['Helvetica_Neue'] font-bold text-[#333] placeholder-[#c1c1c1] px-4 py-3"
+                    autoComplete="off"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3 px-4 pb-4">
+                <button
+                  onClick={handleBackToPrompt}
+                  className="flex-1 h-[44px] bg-gray-400 hover:bg-gray-500 rounded-2xl transition-colors font-semibold text-white text-[15px]"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !apiKey.trim()}
+                  className="flex-1 h-[44px] bg-[#6AADFF] hover:bg-[#5A9AEF] rounded-2xl transition-colors font-semibold text-white text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? 'Generating...' : 'Generate'}
+                </button>
               </div>
             </div>
           ) : isDropdownOpen ? (
@@ -222,23 +296,22 @@ export default function UserInput() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isGenerating && !previewImage && inputValue.trim()) {
+                    if (e.key === 'Enter' && !isGenerating && inputValue.trim()) {
                       e.preventDefault();
-                      handleGenerate();
+                      handleInitialGenerate();
                     }
                   }}
-                  disabled={!!previewImage}
                   className={`w-full h-full bg-transparent border-none outline-none text-[20px] font-['Helvetica_Neue'] font-bold placeholder-[#c1c1c1] ${
                     inputValue ? 'text-black' : 'text-[#c1c1c1]'
-                  } ${previewImage ? 'opacity-50' : ''}`}
+                  }`}
                 />
               </div>
 
               {/* Send Button */}
               <div className="pr-[5px]">
                 <button 
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !inputValue.trim() || !!previewImage}
+                  onClick={handleInitialGenerate}
+                  disabled={isGenerating || !inputValue.trim()}
                   className="w-[60px] h-[60px] bg-[#6AADFF] rounded-[20px] flex items-center justify-center hover:bg-[#5A9AEF] transition-colors outline-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? (
