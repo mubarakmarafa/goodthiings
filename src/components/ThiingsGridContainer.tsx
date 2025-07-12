@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useImageGeneration, type GeneratedImage } from '../hooks/useImageGeneration';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner';
+// import { toast } from 'sonner';
 import ThiingsGrid, { type ItemConfig } from "../../lib/ThiingsGrid";
 
 // Configuration - Easy to customize

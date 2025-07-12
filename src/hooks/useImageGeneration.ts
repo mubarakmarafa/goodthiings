@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const SUPABASE_URL = 'https://whstudldcjncgyybfezn.supabase.co';
